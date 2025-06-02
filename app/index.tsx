@@ -4,20 +4,34 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from './contexts/AuthContext';
 
 export default function Index() {
-  const { isAuthenticated, isLoading, shouldAutoLogin, logoutTriggered } = useAuth();
+  const { isAuthenticated, isLoading, logoutTriggered, navigationTrigger } = useAuth();
   const router = useRouter();
   const [hasNavigated, setHasNavigated] = useState(false);
+  const [lastLogoutTriggered, setLastLogoutTriggered] = useState(0);
 
   // Reset navigation state when auth state changes OR logout is triggered
   useEffect(() => {
     setHasNavigated(false);
   }, [isAuthenticated, logoutTriggered]);
 
+  // Force navigation when logout is detected
+  useEffect(() => {
+    if (logoutTriggered > lastLogoutTriggered) {
+      console.log('🚨 Logout detected! Force navigating to auth...');
+      setLastLogoutTriggered(logoutTriggered);
+      setHasNavigated(false);
+      
+      // Force navigation to auth screen
+      setTimeout(() => {
+        router.replace('/auth' as any);
+      }, 100);
+    }
+  }, [logoutTriggered, lastLogoutTriggered, router]);
+
   useEffect(() => {
     console.log('🔄 Index routing check:', {
       isLoading,
       isAuthenticated,
-      shouldAutoLogin,
       hasNavigated,
       logoutTriggered
     });
@@ -25,15 +39,32 @@ export default function Index() {
     if (!isLoading && !hasNavigated) {
       if (isAuthenticated) {
         console.log('🔄 User is authenticated, navigating to feed...');
-        router.replace('/(tabs)/feed');
-        setHasNavigated(true);
+        try {
+          router.replace('/(tabs)/feed');
+          setHasNavigated(true);
+          console.log('✅ Navigation to feed initiated');
+        } catch (error) {
+          console.error('❌ Navigation to feed failed:', error);
+          setHasNavigated(false); // Reset if navigation fails
+        }
       } else {
         console.log('🔄 User not authenticated, navigating to auth...');
-        router.replace('/auth' as any);
-        setHasNavigated(true);
+        try {
+          router.replace('/auth' as any);
+          setHasNavigated(true);
+          console.log('✅ Navigation to auth initiated');
+        } catch (error) {
+          console.error('❌ Navigation to auth failed:', error);
+          setHasNavigated(false); // Reset if navigation fails
+        }
       }
+    } else {
+      console.log('ℹ️ Skipping navigation:', {
+        isLoading: isLoading ? 'still loading' : 'loaded',
+        hasNavigated: hasNavigated ? 'already navigated' : 'not navigated yet'
+      });
     }
-  }, [isAuthenticated, isLoading, shouldAutoLogin, router, hasNavigated, logoutTriggered]);
+  }, [isAuthenticated, isLoading, router, hasNavigated, logoutTriggered]);
 
   return (
     <View style={styles.loadingContainer}>

@@ -39,6 +39,7 @@ interface AuthContextType {
   isLoading: boolean;
   shouldAutoLogin: boolean;
   logoutTriggered: number;
+  navigationTrigger: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [shouldAutoLogin, setShouldAutoLogin] = useState(false);
   const [logoutTriggered, setLogoutTriggered] = useState(0);
+  const [navigationTrigger, setNavigationTrigger] = useState(0);
 
   // Check if user should auto-login on app start
   useEffect(() => {
@@ -79,11 +81,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('🔄 Auth state changed:', {
         firebaseUser: firebaseUser ? firebaseUser.email : 'none',
-        shouldAutoLogin
+        shouldAutoLogin,
+        currentIsAuthenticated: isAuthenticated
       });
 
       if (firebaseUser) {
         // User is signed in
+        console.log('✅ Firebase user detected, setting authenticated state...');
         setFirebaseUser(firebaseUser);
         setIsAuthenticated(true);
         
@@ -96,18 +100,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!shouldAutoLogin) {
           console.log('ℹ️ User logged in without auto-login preference');
         }
+        
+        console.log('🎉 Authentication complete! Navigation will be handled by components');
+        // Just trigger the navigation counter, let components handle routing
+        setNavigationTrigger(prev => prev + 1);
+        
       } else {
         // User is signed out
         console.log('🔄 User signed out, clearing state...');
         setFirebaseUser(null);
         setUser(null);
         setIsAuthenticated(false);
+        
+        // Trigger navigation to auth page
+        setNavigationTrigger(prev => prev + 1);
       }
       setIsLoading(false);
+      console.log('📊 Final auth state:', {
+        isAuthenticated: firebaseUser ? true : false,
+        isLoading: false
+      });
     });
 
     return unsubscribe;
-  }, [shouldAutoLogin]);
+  }, [shouldAutoLogin, isAuthenticated]);
 
   const fetchUserData = async (uid: string) => {
     try {
@@ -126,6 +142,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('🔄 Starting login attempt...');
       console.log('📧 Email:', email);
       console.log('🔒 Stay logged in:', stayLoggedIn);
+      console.log('📊 Current auth state before login:', {
+        isAuthenticated,
+        isLoading,
+        firebaseUser: firebaseUser?.email || 'none'
+      });
       
       // Store login preference BEFORE login to ensure auth state listener has it
       console.log('🔄 Storing login preference...');
@@ -142,8 +163,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const loginPromise = signInWithEmailAndPassword(auth, email, password);
       
       console.log('🔄 Sending login request to Firebase...');
-      await Promise.race([loginPromise, timeoutPromise]);
+      const userCredential = await Promise.race([loginPromise, timeoutPromise]) as any;
       console.log('✅ Firebase login successful');
+      console.log('👤 Logged in user:', userCredential?.user?.email || 'unknown');
+      
+      // Wait a moment for the auth state listener to process
+      console.log('⏳ Waiting for auth state listener to process...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('📊 Auth state after login:', {
+        isAuthenticated,
+        isLoading,
+        firebaseUser: firebaseUser?.email || 'none'
+      });
       
       console.log('🎉 Login completed successfully!');
       return true;
@@ -321,6 +353,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     shouldAutoLogin,
     logoutTriggered,
+    navigationTrigger,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

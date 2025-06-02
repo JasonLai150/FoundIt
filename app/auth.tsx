@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -14,16 +14,32 @@ import {
 import { useAuth } from './contexts/AuthContext';
 
 export default function AuthScreen() {
-  const { login, register } = useAuth();
+  const { login, register, isAuthenticated, navigationTrigger } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [stayLoggedIn, setStayLoggedIn] = useState(true);
+  const [hasNavigated, setHasNavigated] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
   });
+
+  // Listen for authentication success and navigate
+  useEffect(() => {
+    if (isAuthenticated && !hasNavigated) {
+      console.log('🔄 Auth screen detected authentication, navigating to feed...');
+      setHasNavigated(true);
+      try {
+        router.replace('/(tabs)/feed');
+        console.log('✅ Navigation from auth screen initiated');
+      } catch (error) {
+        console.error('❌ Navigation from auth screen failed:', error);
+        setHasNavigated(false); // Reset if navigation failed
+      }
+    }
+  }, [isAuthenticated, navigationTrigger, router, hasNavigated]);
 
   const handleAuthentication = async () => {
     if (!formData.email || !formData.password) {
@@ -59,8 +75,11 @@ export default function AuthScreen() {
       } else {
         console.log('🔄 Attempting login...');
         success = await login(formData.email, formData.password, stayLoggedIn);
+        console.log('📊 Login result:', success);
         if (!success) {
           Alert.alert('Login Failed', 'Invalid email or password. Please try again.');
+        } else {
+          console.log('✅ Login successful! Auth screen will handle navigation...');
         }
       }
     } catch (error) {

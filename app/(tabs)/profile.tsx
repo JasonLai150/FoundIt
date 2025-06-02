@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ProfileScreen() {
@@ -10,30 +10,38 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     console.log('🚪 Logout button pressed!');
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { 
-          text: 'Cancel', 
-          style: 'cancel',
-          onPress: () => console.log('❌ Logout cancelled')
-        },
-        { 
-          text: 'Logout', 
-          style: 'destructive', 
-          onPress: async () => {
-            console.log('🔄 User confirmed logout');
-            try {
-              await logout();
-              console.log('✅ Logout completed - auth state should trigger navigation');
-            } catch (error) {
-              console.error('❌ Logout failed:', error);
-            }
-          }
-        },
-      ]
-    );
+    
+    // For web compatibility, use window.confirm instead of Alert
+    const confirmLogout = typeof window !== 'undefined' && window.confirm 
+      ? window.confirm('Are you sure you want to logout?')
+      : true; // For mobile, just proceed
+
+    if (confirmLogout) {
+      console.log('🔄 User confirmed logout');
+      performLogout();
+    } else {
+      console.log('❌ Logout cancelled');
+    }
+  };
+
+  const performLogout = async () => {
+    try {
+      console.log('🔄 Starting logout process...');
+      await logout();
+      console.log('✅ Logout completed - auth state should trigger navigation');
+      
+      // Add a manual navigation fallback
+      setTimeout(() => {
+        console.log('🔄 Manual navigation fallback - checking if still on profile...');
+        // Force a page reload as fallback
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth';
+        }
+      }, 2000);
+      
+    } catch (error) {
+      console.error('❌ Logout failed:', error);
+    }
   };
 
   return (
@@ -106,17 +114,6 @@ export default function ProfileScreen() {
               <Text style={styles.infoText}>{user.experience} years</Text>
             </View>
           )}
-
-          {/* Test logout button for debugging */}
-          <TouchableOpacity
-            style={styles.testLogoutButton}
-            onPress={() => {
-              console.log('🧪 Test logout button pressed!');
-              handleLogout();
-            }}
-          >
-            <Text style={styles.testLogoutText}>🚪 Test Logout (Debug)</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -219,18 +216,5 @@ const styles = StyleSheet.create({
   skillText: {
     fontSize: 14,
     color: '#333',
-  },
-  testLogoutButton: {
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 88, 100, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 88, 100, 0.2)',
-    alignItems: 'center',
-  },
-  testLogoutText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#FF5864',
   },
 }); 
