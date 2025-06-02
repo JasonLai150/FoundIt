@@ -8,7 +8,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: '#FF5864', // Dating app like color (similar to Tinder/Hinge)
-        headerShown: true,
+        headerShown: false,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           paddingBottom: Platform.OS === 'ios' ? 20 : 10,

@@ -8,10 +8,6 @@ export default function FeedScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Discover</Text>
-      </View>
-      
       <View style={styles.content}>
         {loading ? (
           <ActivityIndicator size="large" color="#FF5864" />
@@ -38,16 +34,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-  },
-  header: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
   },
   content: {
     flex: 1,
