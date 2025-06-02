@@ -14,6 +14,10 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Messages</Text>
+      </View>
+      
       {emptyChat ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Your conversations with matched developers will appear here</Text>
@@ -34,6 +38,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 16,
+    backgroundColor: '#fff',
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#333',
+    letterSpacing: -0.5,
   },
   chatList: {
     flex: 1,

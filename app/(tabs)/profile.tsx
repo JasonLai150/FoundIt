@@ -5,6 +5,10 @@ import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Profile</Text>
+      </View>
+      
       <ScrollView style={styles.scrollView}>
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
@@ -47,6 +51,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 16,
+    backgroundColor: '#fff',
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#333',
+    letterSpacing: -0.5,
   },
   scrollView: {
     flex: 1,
