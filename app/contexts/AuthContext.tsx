@@ -38,6 +38,7 @@ interface AuthContextType {
   updateUserProfile: (userData: Partial<User>) => Promise<boolean>;
   isLoading: boolean;
   shouldAutoLogin: boolean;
+  logoutTriggered: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [shouldAutoLogin, setShouldAutoLogin] = useState(false);
+  const [logoutTriggered, setLogoutTriggered] = useState(0);
 
   // Check if user should auto-login on app start
   useEffect(() => {
@@ -75,21 +77,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Listen to authentication state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser && shouldAutoLogin) {
-        // User is signed in and should auto-login
+      console.log('🔄 Auth state changed:', {
+        firebaseUser: firebaseUser ? firebaseUser.email : 'none',
+        shouldAutoLogin
+      });
+
+      if (firebaseUser) {
+        // User is signed in
         setFirebaseUser(firebaseUser);
         setIsAuthenticated(true);
         
+        console.log('✅ User authenticated, fetching user data...');
         // Fetch user data from Firestore
         await fetchUserData(firebaseUser.uid);
-      } else if (firebaseUser && !shouldAutoLogin) {
-        // User is signed in but shouldn't auto-login, so sign them out
-        await signOut(auth);
-        setFirebaseUser(null);
-        setUser(null);
-        setIsAuthenticated(false);
+        
+        // If user shouldn't auto-login but they're manually logging in, that's okay
+        // We only sign them out if they have an existing session but don't want auto-login
+        if (!shouldAutoLogin) {
+          console.log('ℹ️ User logged in without auto-login preference');
+        }
       } else {
         // User is signed out
+        console.log('🔄 User signed out, clearing state...');
         setFirebaseUser(null);
         setUser(null);
         setIsAuthenticated(false);
@@ -114,15 +123,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string, stayLoggedIn: boolean = false): Promise<boolean> => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      console.log('🔄 Starting login attempt...');
+      console.log('📧 Email:', email);
+      console.log('🔒 Stay logged in:', stayLoggedIn);
       
-      // Store login preference
+      // Store login preference BEFORE login to ensure auth state listener has it
+      console.log('🔄 Storing login preference...');
       await AsyncStorage.setItem('stayLoggedIn', stayLoggedIn.toString());
       setShouldAutoLogin(stayLoggedIn);
+      console.log('✅ Login preference stored');
       
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Login timeout - request took too long')), 10000); // 10 second timeout
+      });
+      
+      // Race between login and timeout
+      const loginPromise = signInWithEmailAndPassword(auth, email, password);
+      
+      console.log('🔄 Sending login request to Firebase...');
+      await Promise.race([loginPromise, timeoutPromise]);
+      console.log('✅ Firebase login successful');
+      
+      console.log('🎉 Login completed successfully!');
       return true;
     } catch (error: any) {
-      console.error('Login error:', error.message);
+      console.error('❌ Login error:', error);
+      console.error('❌ Error code:', error.code);
+      console.error('❌ Error message:', error.message);
+      
+      // Show specific error messages to user
+      let userMessage = 'Login failed. Please try again.';
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          userMessage = 'No account found with this email address.';
+          break;
+        case 'auth/wrong-password':
+          userMessage = 'Incorrect password. Please try again.';
+          break;
+        case 'auth/invalid-email':
+          userMessage = 'Please enter a valid email address.';
+          break;
+        case 'auth/too-many-requests':
+          userMessage = 'Too many failed attempts. Please try again later.';
+          break;
+        case 'auth/network-request-failed':
+          userMessage = 'Network error. Please check your internet connection.';
+          break;
+        default:
+          if (error.message.includes('timeout')) {
+            userMessage = 'Login request timed out. This might be due to network blocking. Try disabling browser extensions or using incognito mode.';
+          } else {
+            userMessage = error.message || 'An unexpected error occurred.';
+          }
+      }
+      
+      Alert.alert('Login Failed', userMessage);
       return false;
     }
   };
@@ -209,24 +266,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('🔄 Starting logout process...');
       
-      // Clear login preference
+      // Clear login preference first
+      console.log('🔄 Clearing login preference...');
       await AsyncStorage.removeItem('stayLoggedIn');
+      setShouldAutoLogin(false);
       console.log('✅ Cleared login preference');
       
-      setShouldAutoLogin(false);
-      console.log('✅ Set shouldAutoLogin to false');
-      
-      // Clear local state first
+      // Clear local state
+      console.log('🔄 Clearing local state...');
       setUser(null);
       setFirebaseUser(null);
       setIsAuthenticated(false);
       console.log('✅ Cleared local state');
       
-      // Sign out from Firebase
+      // Sign out from Firebase (this will trigger onAuthStateChanged)
+      console.log('🔄 Signing out from Firebase...');
       await signOut(auth);
       console.log('✅ Signed out from Firebase');
       
       console.log('🎉 Logout completed successfully!');
+      setLogoutTriggered(logoutTriggered + 1);
     } catch (error: any) {
       console.error('❌ Logout error:', error.message);
     }
@@ -261,6 +320,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updateUserProfile,
     isLoading,
     shouldAutoLogin,
+    logoutTriggered,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

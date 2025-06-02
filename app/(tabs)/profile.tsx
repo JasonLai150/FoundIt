@@ -9,11 +9,16 @@ export default function ProfileScreen() {
   const router = useRouter();
 
   const handleLogout = () => {
+    console.log('🚪 Logout button pressed!');
     Alert.alert(
       'Logout',
       'Are you sure you want to logout?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => console.log('❌ Logout cancelled')
+        },
         { 
           text: 'Logout', 
           style: 'destructive', 
@@ -21,15 +26,9 @@ export default function ProfileScreen() {
             console.log('🔄 User confirmed logout');
             try {
               await logout();
-              console.log('🔄 Navigating to auth screen...');
-              // Use different navigation methods to ensure it works
-              router.dismissAll?.(); // Dismiss any modals if present
-              router.replace('/(tabs)/../auth' as any); // Explicit path
-              console.log('✅ Navigation completed');
+              console.log('✅ Logout completed - auth state should trigger navigation');
             } catch (error) {
-              console.error('❌ Navigation error:', error);
-              // Fallback: try a different navigation approach
-              router.push('/auth' as any);
+              console.error('❌ Logout failed:', error);
             }
           }
         },
@@ -41,7 +40,11 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity 
+          style={styles.logoutButton} 
+          onPress={handleLogout}
+          activeOpacity={0.7}
+        >
           <Ionicons name="log-out-outline" size={24} color="#FF5864" />
         </TouchableOpacity>
       </View>
@@ -103,6 +106,17 @@ export default function ProfileScreen() {
               <Text style={styles.infoText}>{user.experience} years</Text>
             </View>
           )}
+
+          {/* Test logout button for debugging */}
+          <TouchableOpacity
+            style={styles.testLogoutButton}
+            onPress={() => {
+              console.log('🧪 Test logout button pressed!');
+              handleLogout();
+            }}
+          >
+            <Text style={styles.testLogoutText}>🚪 Test Logout (Debug)</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -130,7 +144,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   logoutButton: {
-    padding: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 88, 100, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 88, 100, 0.2)',
   },
   scrollView: {
     flex: 1,
@@ -201,5 +219,18 @@ const styles = StyleSheet.create({
   skillText: {
     fontSize: 14,
     color: '#333',
+  },
+  testLogoutButton: {
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 88, 100, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 88, 100, 0.2)',
+    alignItems: 'center',
+  },
+  testLogoutText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FF5864',
   },
 }); 

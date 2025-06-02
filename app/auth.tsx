@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
@@ -14,6 +15,7 @@ import { useAuth } from './contexts/AuthContext';
 
 export default function AuthScreen() {
   const { login, register } = useAuth();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [stayLoggedIn, setStayLoggedIn] = useState(true);
@@ -76,6 +78,10 @@ export default function AuthScreen() {
 
   const toggleStayLoggedIn = () => {
     setStayLoggedIn(!stayLoggedIn);
+  };
+
+  const goToFirebaseTest = () => {
+    router.push('/test-firebase' as any);
   };
 
   return (
@@ -148,6 +154,13 @@ export default function AuthScreen() {
                 : "Don't have an account? Sign Up"
               }
             </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.debugButton}
+            onPress={goToFirebaseTest}
+          >
+            <Text style={styles.debugText}>🔧 Test Firebase Connection</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -236,5 +249,14 @@ const styles = StyleSheet.create({
   switchText: {
     color: '#FF5864',
     fontSize: 14,
+  },
+  debugButton: {
+    marginTop: 20,
+    alignItems: 'center',
+    padding: 10,
+  },
+  debugText: {
+    color: '#999',
+    fontSize: 12,
   },
 }); 
