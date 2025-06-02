@@ -21,10 +21,8 @@ export default function Index() {
       setLastLogoutTriggered(logoutTriggered);
       setHasNavigated(false);
       
-      // Force navigation to auth screen
-      setTimeout(() => {
-        router.replace('/auth' as any);
-      }, 100);
+      // Immediate navigation to auth screen
+      router.replace('/auth' as any);
     }
   }, [logoutTriggered, lastLogoutTriggered, router]);
 
