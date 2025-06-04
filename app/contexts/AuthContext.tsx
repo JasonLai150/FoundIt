@@ -304,23 +304,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setShouldAutoLogin(false);
       console.log('✅ Cleared login preference');
       
-      // Clear local state IMMEDIATELY (don't wait for Firebase)
-      console.log('🔄 Clearing local state immediately...');
-      setUser(null);
-      setFirebaseUser(null);
-      setIsAuthenticated(false);
-      setLogoutTriggered(prev => prev + 1);
-      console.log('✅ Cleared local state and triggered logout');
+      // Sign out from Firebase FIRST (await it to ensure it completes)
+      console.log('🔄 Signing out from Firebase...');
+      await signOut(auth);
+      console.log('✅ Firebase signout completed');
       
-      // Sign out from Firebase in the background (don't await it)
-      console.log('🔄 Signing out from Firebase in background...');
-      signOut(auth).catch(error => {
-        console.error('❌ Background Firebase signout error:', error);
-      });
+      // The auth state listener will handle clearing local state
+      // No need to manually clear it here as it can cause race conditions
       
       console.log('🎉 Logout completed successfully!');
     } catch (error: any) {
       console.error('❌ Logout error:', error.message);
+      
+      // If Firebase signout fails, still clear local state
+      console.log('🔄 Firebase signout failed, clearing local state manually...');
+      setUser(null);
+      setFirebaseUser(null);
+      setIsAuthenticated(false);
     }
   };
 

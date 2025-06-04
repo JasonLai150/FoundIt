@@ -29,16 +29,6 @@ export default function ProfileScreen() {
       console.log('🔄 Starting logout process...');
       await logout();
       console.log('✅ Logout completed - auth state should trigger navigation');
-      
-      // Add a manual navigation fallback
-      setTimeout(() => {
-        console.log('🔄 Manual navigation fallback - checking if still on profile...');
-        // Force a page reload as fallback
-        if (typeof window !== 'undefined') {
-          window.location.href = '/auth';
-        }
-      }, 2000);
-      
     } catch (error) {
       console.error('❌ Logout failed:', error);
     }
@@ -164,9 +154,6 @@ const styles = StyleSheet.create({
   logoutButton: {
     padding: 12,
     borderRadius: 8,
-    backgroundColor: 'rgba(255, 88, 100, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 88, 100, 0.2)',
   },
   scrollView: {
     flex: 1,
