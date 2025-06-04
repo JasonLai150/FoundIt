@@ -44,6 +44,27 @@ export default function ProfileScreen() {
     }
   };
 
+  // Add loading state check
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <TouchableOpacity 
+            style={styles.logoutButton} 
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="log-out-outline" size={24} color="#FF5864" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -65,21 +86,21 @@ export default function ProfileScreen() {
             </View>
           </View>
           
-          <Text style={styles.name}>{user?.name || 'Your Name'}</Text>
-          <Text style={styles.email}>{user?.email || 'your.email@example.com'}</Text>
-          <Text style={styles.role}>{user?.role || 'Full Stack Developer'}</Text>
+          <Text style={styles.name}>{user.name || 'Your Name'}</Text>
+          <Text style={styles.email}>{user.email || 'your.email@example.com'}</Text>
+          <Text style={styles.role}>{user.role || 'Full Stack Developer'}</Text>
           
           <View style={styles.infoSection}>
             <Text style={styles.sectionTitle}>About Me</Text>
             <Text style={styles.bio}>
-              {user?.bio || 'Share information about your skills, experience, and what kind of developers you\'re looking to connect with.'}
+              {user.bio || 'Share information about your skills, experience, and what kind of developers you\'re looking to connect with.'}
             </Text>
           </View>
           
           <View style={styles.infoSection}>
             <Text style={styles.sectionTitle}>Skills</Text>
             <View style={styles.skillsContainer}>
-              {user?.skills && user.skills.length > 0 ? (
+              {user.skills && user.skills.length > 0 ? (
                 user.skills.map((skill, index) => (
                   <View key={index} style={styles.skillBadge}>
                     <Text style={styles.skillText}>{skill}</Text>
@@ -101,17 +122,17 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {user?.location && (
+          {user.location && (
             <View style={styles.infoSection}>
               <Text style={styles.sectionTitle}>Location</Text>
               <Text style={styles.infoText}>{user.location}</Text>
             </View>
           )}
 
-          {user?.experience && (
+          {user.experience !== undefined && user.experience !== null && (
             <View style={styles.infoSection}>
               <Text style={styles.sectionTitle}>Experience</Text>
-              <Text style={styles.infoText}>{user.experience} years</Text>
+              <Text style={styles.infoText}>{user.experience.toString()} years</Text>
             </View>
           )}
         </View>
@@ -216,5 +237,14 @@ const styles = StyleSheet.create({
   skillText: {
     fontSize: 14,
     color: '#333',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
   },
 }); 

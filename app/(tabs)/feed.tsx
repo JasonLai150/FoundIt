@@ -1,7 +1,9 @@
 import React from 'react';
-import { ActivityIndicator, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import DeveloperCard from '../components/DeveloperCard';
+import { ActivityIndicator, Dimensions, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import FlippableSwipeCard from '../components/FlippableSwipeCard';
 import { useFeedViewModel } from '../viewmodels/FeedViewModel';
+
+const { height: screenHeight } = Dimensions.get('window');
 
 export default function FeedScreen() {
   const { developer, loading, error, swipeLeft, swipeRight, noMoreDevelopers } = useFeedViewModel();
@@ -23,7 +25,7 @@ export default function FeedScreen() {
             <Text style={styles.emptySubText}>Check back later for more matches</Text>
           </View>
         ) : developer ? (
-          <DeveloperCard 
+          <FlippableSwipeCard 
             developer={developer} 
             onSwipeLeft={swipeLeft} 
             onSwipeRight={swipeRight} 
@@ -41,21 +43,22 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingTop: screenHeight < 700 ? 4 : 8,
+    paddingBottom: screenHeight < 700 ? 8 : 12,
     backgroundColor: '#fff',
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: screenHeight < 700 ? 28 : 32,
     fontWeight: '700',
     color: '#333',
     letterSpacing: -0.5,
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: screenHeight < 700 ? 60 : 80, // Space for tab bar and swipe indicators
   },
   errorText: {
     fontSize: 16,
