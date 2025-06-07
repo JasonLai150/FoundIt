@@ -1,20 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    Animated,
-    Dimensions,
-    Image,
-    PanResponder,
-    Platform,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  Image,
+  PanResponder,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import {
-    PanGestureHandler,
-    PanGestureHandlerGestureEvent,
-    State,
+  PanGestureHandler,
+  PanGestureHandlerGestureEvent,
+  State,
 } from 'react-native-gesture-handler';
 import { Developer, Skill } from '../models/Developer';
 
@@ -50,6 +50,7 @@ const getCardDimensions = () => {
 
 const { cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT } = getCardDimensions();
 const SWIPE_THRESHOLD = 120;
+const isSmallScreen = screenHeight < 700;
 
 const SkillBadge = ({ skill }: { skill: Skill }) => (
   <View style={styles.skillBadge}>
@@ -63,21 +64,20 @@ export default function FlippableSwipeCard({
   onSwipeLeft, 
   onSwipeRight 
 }: FlippableSwipeCardProps) {
-  const [isFlipped, setIsFlipped] = useState(false);
-  const flipAnimation = useRef(new Animated.Value(0)).current;
+  const [scrollY, setScrollY] = useState(0);
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const rotateZ = useRef(new Animated.Value(0)).current;
+  const scrollIndicatorOpacity = useRef(new Animated.Value(1)).current;
 
-  const flipCard = () => {
-    const toValue = isFlipped ? 0 : 1;
-    Animated.timing(flipAnimation, {
-      toValue,
-      duration: 600,
+  // Hide scroll indicator when scrolled
+  useEffect(() => {
+    Animated.timing(scrollIndicatorOpacity, {
+      toValue: scrollY > 50 ? 0 : 1,
+      duration: 300,
       useNativeDriver: true,
     }).start();
-    setIsFlipped(!isFlipped);
-  };
+  }, [scrollY]);
 
   const handleSwipeEnd = (translationX: number) => {
     if (translationX > SWIPE_THRESHOLD) {
@@ -198,18 +198,8 @@ export default function FlippableSwipeCard({
       // Fixed rotation based on direction and progress
       const rotationValue = (event.nativeEvent.translationX / SWIPE_THRESHOLD) * 0.3;
       
-      Animated.parallel([
-        Animated.timing(translateY, {
-          toValue: downwardOffset,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rotateZ, {
-          toValue: rotationValue,
-          duration: 0,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      translateY.setValue(downwardOffset);
+      rotateZ.setValue(rotationValue);
     }
   };
 
@@ -219,117 +209,127 @@ export default function FlippableSwipeCard({
     rotateZ.setValue(0);
   };
 
-  const isSmallScreen = screenHeight < 700;
-
-  const frontAnimatedStyle = {
-    transform: [
-      { 
-        rotateY: flipAnimation.interpolate({
-          inputRange: [0, 1],
-          outputRange: ['0deg', '180deg'],
-        }) 
-      },
-    ],
-  };
-
-  const backAnimatedStyle = {
-    transform: [
-      { 
-        rotateY: flipAnimation.interpolate({
-          inputRange: [0, 1],
-          outputRange: ['180deg', '360deg'],
-        }) 
-      },
-    ],
-  };
-
   const cardAnimatedStyle = {
     transform: [
       { translateX },
       { translateY },
       { 
         rotate: rotateZ.interpolate({
-          inputRange: [-1, 0, 1],
-          outputRange: ['-30deg', '0deg', '30deg'],
-        }) 
+          inputRange: [-1, 1],
+          outputRange: ['-15deg', '15deg'],
+        })
       },
     ],
   };
 
-  const renderFrontCard = () => (
-    <Animated.View style={[styles.cardFace, styles.frontCard, frontAnimatedStyle]}>
-      <TouchableOpacity onPress={flipCard} style={styles.cardContent} activeOpacity={0.95}>
-        <View style={styles.imageContainer}>
-          {developer.avatarUrl ? (
-            <Image source={{ uri: developer.avatarUrl }} style={styles.profileImage} />
-          ) : (
-            <View style={styles.placeholderImage}>
-              <Ionicons name="person" size={isSmallScreen ? 60 : 80} color="#999" />
+  const renderScrollableCard = () => (
+    <View style={styles.card}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={(event) => {
+          setScrollY(event.nativeEvent.contentOffset.y);
+        }}
+        scrollEventThrottle={16}
+      >
+        {/* Initial view content - Tinder-style layout */}
+        <View style={styles.initialView}>
+          {/* Large hero image */}
+          <View style={styles.heroImageContainer}>
+            {developer.avatarUrl ? (
+              <Image source={{ uri: developer.avatarUrl }} style={styles.heroImage} />
+            ) : (
+              <View style={styles.placeholderHeroImage}>
+                <Ionicons name="person" size={isSmallScreen ? 80 : 100} color="#999" />
+              </View>
+            )}
+            
+            {/* Gradient overlay for text readability */}
+            <View style={styles.imageOverlay} />
+            
+            {/* Text overlay on image */}
+            <View style={styles.imageTextOverlay}>
+              <Text style={[styles.heroName, isSmallScreen && styles.heroNameSmall]}>{developer.name}</Text>
+              <Text style={[styles.heroAge, isSmallScreen && styles.heroAgeSmall]}>
+                {developer.experience} years experience
+              </Text>
             </View>
-          )}
-        </View>
-        
-        <View style={styles.frontInfo}>
-          <Text style={[styles.name, isSmallScreen && styles.nameSmall]}>{developer.name}</Text>
-          <Text style={[styles.role, isSmallScreen && styles.roleSmall]}>{developer.role}</Text>
-          
-          <View style={styles.locationContainer}>
-            <Ionicons name="location-outline" size={16} color="#666" />
-            <Text style={styles.locationText}>{developer.location}</Text>
           </View>
           
-          <Text style={styles.experienceText}>{developer.experience} years experience</Text>
-          
-          <View style={styles.topSkillsContainer}>
-            <Text style={[styles.topSkillsTitle, isSmallScreen && styles.topSkillsTitleSmall]}>Top Skills</Text>
-            <View style={styles.topSkillsList}>
-              {developer.skills.slice(0, 3).map((skill, index) => (
-                <View key={index} style={styles.topSkillBadge}>
-                  <Text style={styles.topSkillText}>{skill.name}</Text>
+          {/* Compact info section */}
+          <View style={styles.compactInfo}>
+            <Text style={[styles.role, isSmallScreen && styles.roleSmall]}>{developer.role}</Text>
+            
+            <View style={styles.infoDetails}>
+              <View style={styles.locationContainer}>
+                <Ionicons name="location-outline" size={16} color="#666" />
+                <Text style={styles.locationText}>{developer.location}</Text>
+              </View>
+              
+              {developer.company && (
+                <View style={styles.companyContainer}>
+                  <Ionicons name="business-outline" size={16} color="#666" />
+                  <Text style={styles.companyText}>{developer.company}</Text>
                 </View>
-              ))}
-              {developer.skills.length > 3 && (
-                <View style={styles.moreSkillsBadge}>
-                  <Text style={styles.moreSkillsText}>+{developer.skills.length - 3}</Text>
+              )}
+              
+              {developer.education && (
+                <View style={styles.educationContainer}>
+                  <Ionicons name="school-outline" size={16} color="#666" />
+                  <Text style={styles.educationText}>{developer.education}</Text>
                 </View>
               )}
             </View>
+            
+            <View style={styles.topSkillsContainer}>
+              <View style={styles.topSkillsList}>
+                {developer.skills.slice(0, 3).map((skill, index) => (
+                  <View key={index} style={styles.topSkillBadge}>
+                    <Text style={styles.topSkillText}>{skill.name}</Text>
+                  </View>
+                ))}
+                {developer.skills.length > 3 && (
+                  <View style={styles.moreSkillsBadge}>
+                    <Text style={styles.moreSkillsText}>+{developer.skills.length - 3}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
         </View>
-        
-        <View style={styles.flipIndicator}>
-          <Ionicons name="refresh-outline" size={18} color="#999" />
-          <Text style={styles.flipText}>Tap to see more</Text>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
 
-  const renderBackCard = () => (
-    <Animated.View style={[styles.cardFace, styles.backCard, backAnimatedStyle]}>
-      <TouchableOpacity onPress={flipCard} style={styles.cardContent} activeOpacity={0.95}>
-        <View style={styles.backHeader}>
-          <Text style={[styles.backName, isSmallScreen && styles.backNameSmall]}>{developer.name}</Text>
-          <Text style={[styles.backRole, isSmallScreen && styles.backRoleSmall]}>{developer.role}</Text>
-        </View>
-        
-        <View style={styles.detailsContainer}>
+        {/* Scroll indicator */}
+        <Animated.View 
+          style={[
+            styles.scrollIndicator, 
+            { opacity: scrollIndicatorOpacity }
+          ]}
+        >
+          <Ionicons name="chevron-down" size={20} color="#007AFF" />
+          <Text style={styles.scrollText}>Scroll to view more</Text>
+        </Animated.View>
+
+        {/* Detailed content */}
+        <View style={styles.detailsSection}>
           {developer.bio && (
-            <>
+            <View style={styles.detailBlock}>
               <Text style={[styles.sectionTitle, isSmallScreen && styles.sectionTitleSmall]}>About</Text>
               <Text style={[styles.bioText, isSmallScreen && styles.bioTextSmall]}>{developer.bio}</Text>
-            </>
+            </View>
           )}
           
-          <Text style={[styles.sectionTitle, isSmallScreen && styles.sectionTitleSmall]}>All Skills</Text>
-          <View style={styles.allSkillsContainer}>
-            {developer.skills.map((skill, index) => (
-              <SkillBadge key={index} skill={skill} />
-            ))}
+          <View style={styles.detailBlock}>
+            <Text style={[styles.sectionTitle, isSmallScreen && styles.sectionTitleSmall]}>All Skills</Text>
+            <View style={styles.allSkillsContainer}>
+              {developer.skills.map((skill, index) => (
+                <SkillBadge key={index} skill={skill} />
+              ))}
+            </View>
           </View>
           
           {(developer.github || developer.linkedin || developer.website) && (
-            <View style={styles.socialLinksContainer}>
+            <View style={styles.detailBlock}>
               <Text style={[styles.sectionTitle, isSmallScreen && styles.sectionTitleSmall]}>Connect</Text>
               <View style={styles.socialLinks}>
                 {developer.github && (
@@ -354,15 +354,14 @@ export default function FlippableSwipeCard({
             </View>
           )}
         </View>
-      </TouchableOpacity>
-    </Animated.View>
+      </ScrollView>
+    </View>
   );
 
   const renderCard = () => (
     <View style={styles.container}>
-      <Animated.View style={[styles.card, cardAnimatedStyle]}>
-        {renderFrontCard()}
-        {renderBackCard()}
+      <Animated.View style={[styles.cardWrapper, cardAnimatedStyle]}>
+        {renderScrollableCard()}
       </Animated.View>
       
       {/* Swipe indicators - positioned better for mobile */}
@@ -401,21 +400,18 @@ export default function FlippableSwipeCard({
 const styles = StyleSheet.create({
   container: {
     width: CARD_WIDTH,
-    height: CARD_HEIGHT + 80, // Increased space for indicators
+    height: CARD_HEIGHT + 60, // Reduced from 120 to eliminate whitespace
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  card: {
+  cardWrapper: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    position: 'relative',
   },
-  cardFace: {
-    position: 'absolute',
+  card: {
     width: '100%',
     height: '100%',
-    backfaceVisibility: 'hidden',
     borderRadius: 16,
     backgroundColor: 'white',
     shadowColor: '#000',
@@ -423,86 +419,135 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 6,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
   },
-  frontCard: {
-    zIndex: 2,
-  },
-  backCard: {
-    zIndex: 1,
-  },
-  cardContent: {
+  scrollView: {
     flex: 1,
-    padding: screenHeight < 700 ? 16 : 20, // Responsive padding
   },
-  imageContainer: {
-    alignItems: 'center',
-    marginBottom: screenHeight < 700 ? 12 : 16,
+  scrollContent: {
+    flexGrow: 1,
   },
-  profileImage: {
-    width: screenHeight < 700 ? 120 : 150,
-    height: screenHeight < 700 ? 120 : 150,
-    borderRadius: screenHeight < 700 ? 60 : 75,
-    backgroundColor: '#f0f0f0',
+  initialView: {
+    height: CARD_HEIGHT - 40, // Leave space for scroll indicator
+    padding: 0, // Remove padding to let image extend to edges
+    flexDirection: 'column',
   },
-  placeholderImage: {
-    width: screenHeight < 700 ? 120 : 150,
-    height: screenHeight < 700 ? 120 : 150,
-    borderRadius: screenHeight < 700 ? 60 : 75,
+  heroImageContainer: {
+    position: 'relative',
+    width: '100%',
+    height: '55%', // Reduced from 70% to give more space to skills
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  placeholderHeroImage: {
+    width: '100%',
+    height: '100%',
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  frontInfo: {
+  imageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  imageTextOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    alignItems: 'flex-start',
+  },
+  heroName: {
+    fontSize: screenHeight < 700 ? 28 : 32,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'left',
+    marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  heroNameSmall: {
+    fontSize: 26,
+  },
+  heroAge: {
+    fontSize: screenHeight < 700 ? 16 : 18,
+    color: 'white',
+    textAlign: 'left',
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  heroAgeSmall: {
+    fontSize: 14,
+  },
+  compactInfo: {
     flex: 1,
+    padding: screenHeight < 700 ? 16 : 20,
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  name: {
-    fontSize: screenHeight < 700 ? 24 : 28,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  nameSmall: {
-    fontSize: 22,
-  },
   role: {
-    fontSize: screenHeight < 700 ? 16 : 18,
-    color: '#666',
+    fontSize: screenHeight < 700 ? 18 : 20,
+    color: '#333',
+    fontWeight: '600',
     textAlign: 'center',
     marginBottom: screenHeight < 700 ? 8 : 10,
   },
   roleSmall: {
-    fontSize: 14,
+    fontSize: 16,
+  },
+  infoDetails: {
+    alignItems: 'center',
+    marginBottom: screenHeight < 700 ? 12 : 16,
   },
   locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   locationText: {
     fontSize: 14,
     color: '#666',
     marginLeft: 4,
   },
-  experienceText: {
+  companyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  companyText: {
     fontSize: 14,
     color: '#666',
-    marginBottom: screenHeight < 700 ? 16 : 20,
+    marginLeft: 4,
+  },
+  educationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  educationText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 4,
   },
   topSkillsContainer: {
     width: '100%',
-    marginTop: screenHeight < 700 ? 12 : 16,
-  },
-  topSkillsTitle: {
-    fontSize: screenHeight < 700 ? 18 : 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  topSkillsTitleSmall: {
-    fontSize: 16,
+    alignItems: 'center',
+    marginTop: 'auto',
   },
   topSkillsList: {
     flexDirection: 'row',
@@ -535,50 +580,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  flipIndicator: {
-    flexDirection: 'row',
+  scrollIndicator: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 'auto',
-    paddingTop: 12,
+    paddingVertical: 15,
+    marginTop: -20,
   },
-  flipText: {
+  scrollText: {
     fontSize: 12,
-    color: '#999',
-    marginLeft: 6,
+    color: '#007AFF',
+    marginTop: 4,
+    fontWeight: '500',
   },
-  backHeader: {
-    alignItems: 'center',
-    marginBottom: screenHeight < 700 ? 16 : 20,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+  detailsSection: {
+    padding: screenHeight < 700 ? 16 : 20,
+    paddingTop: 0,
   },
-  backName: {
-    fontSize: screenHeight < 700 ? 22 : 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  backNameSmall: {
-    fontSize: 20,
-  },
-  backRole: {
-    fontSize: screenHeight < 700 ? 14 : 16,
-    color: '#666',
-  },
-  backRoleSmall: {
-    fontSize: 12,
-  },
-  detailsContainer: {
-    flex: 1,
+  detailBlock: {
+    marginBottom: screenHeight < 700 ? 20 : 24,
   },
   sectionTitle: {
     fontSize: screenHeight < 700 ? 16 : 18,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
-    marginTop: screenHeight < 700 ? 12 : 14,
   },
   sectionTitleSmall: {
     fontSize: 14,
@@ -587,7 +611,6 @@ const styles = StyleSheet.create({
     fontSize: screenHeight < 700 ? 14 : 16,
     lineHeight: screenHeight < 700 ? 20 : 22,
     color: '#666',
-    marginBottom: 12,
   },
   bioTextSmall: {
     fontSize: 12,
@@ -614,9 +637,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
-  socialLinksContainer: {
-    marginTop: screenHeight < 700 ? 12 : 14,
-  },
   socialLinks: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -640,10 +660,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
     width: '100%',
     position: 'absolute',
-    bottom: 0,
+    bottom: -20,
   },
   swipeHint: {
     flexDirection: 'row',

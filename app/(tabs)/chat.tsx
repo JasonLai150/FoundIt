@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, FlatList, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 // Define a type for chat messages
 type ChatMessage = {
@@ -8,6 +8,8 @@ type ChatMessage = {
   sender: string;
   timestamp: Date;
 };
+
+const { height: screenHeight } = Dimensions.get('window');
 
 export default function ChatScreen() {
   const emptyChat = true; // This will be replaced with actual state in the future
@@ -41,12 +43,12 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingTop: screenHeight < 700 ? 4 : 8,
+    paddingBottom: screenHeight < 700 ? 8 : 12,
     backgroundColor: '#fff',
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: screenHeight < 700 ? 22 : 24,
     fontWeight: '700',
     color: '#333',
     letterSpacing: -0.5,

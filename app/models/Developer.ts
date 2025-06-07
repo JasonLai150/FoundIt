@@ -13,6 +13,8 @@ export type Developer = {
   avatarUrl?: string;
   location?: string;
   experience?: number; // In years
+  company?: string;
+  education?: string;
   github?: string;
   linkedin?: string;
   website?: string;

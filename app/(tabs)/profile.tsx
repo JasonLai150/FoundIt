@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+
+const { height: screenHeight } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -139,21 +141,23 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingTop: screenHeight < 700 ? 4 : 8,
+    paddingBottom: screenHeight < 700 ? 8 : 12,
     backgroundColor: '#fff',
   },
   headerTitle: {
-    fontSize: 32,
+    fontSize: screenHeight < 700 ? 22 : 24,
     fontWeight: '700',
     color: '#333',
     letterSpacing: -0.5,
+    lineHeight: screenHeight < 700 ? 26 : 28,
   },
   logoutButton: {
-    padding: 12,
+    padding: 8,
     borderRadius: 8,
+    marginTop: -4,
   },
   scrollView: {
     flex: 1,
