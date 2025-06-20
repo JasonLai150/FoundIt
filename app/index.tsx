@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from './contexts/SupabaseAuthContext';
 
 export default function Index() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, navigationTrigger } = useAuth();
   const router = useRouter();
   const [hasNavigated, setHasNavigated] = useState(false);
 
@@ -12,7 +12,8 @@ export default function Index() {
     console.log('🔄 Index routing check:', {
       isLoading,
       isAuthenticated,
-      hasNavigated
+      hasNavigated,
+      navigationTrigger
     });
 
     if (!isLoading && !hasNavigated) {
@@ -45,13 +46,13 @@ export default function Index() {
         hasNavigated: hasNavigated ? 'already navigated' : 'not navigated yet'
       });
     }
-  }, [isAuthenticated, isLoading, router, hasNavigated]);
+  }, [isAuthenticated, isLoading, navigationTrigger, router, hasNavigated]);
 
-  // Reset navigation state when auth state changes
+  // Reset navigation state when auth state changes OR when navigationTrigger changes
   useEffect(() => {
-    console.log('🔄 Auth state changed, resetting navigation flag');
+    console.log('🔄 Auth state or navigation trigger changed, resetting navigation flag');
     setHasNavigated(false);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, navigationTrigger]);
 
   return (
     <View style={styles.loadingContainer}>

@@ -1,42 +1,82 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/SupabaseAuthContext';
+import { showConfirmAlert } from '../utils/alert';
 
 const { height: screenHeight } = Dimensions.get('window');
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+
+  // Navigate to auth page if user is not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      console.log('🔄 Profile: User not authenticated, navigating to auth...');
+      // Use setTimeout to ensure navigation happens after component render
+      setTimeout(() => {
+        router.replace('/auth');
+      }, 100);
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   const handleLogout = () => {
     console.log('🚪 Logout button pressed!');
     
-    // For web compatibility, use window.confirm instead of Alert
-    const confirmLogout = typeof window !== 'undefined' && window.confirm 
-      ? window.confirm('Are you sure you want to logout?')
-      : true; // For mobile, just proceed
-
-    if (confirmLogout) {
-      console.log('🔄 User confirmed logout');
-      performLogout();
-    } else {
-      console.log('❌ Logout cancelled');
-    }
+    // Use cross-platform confirm alert
+    showConfirmAlert(
+      'Logout Confirmation',
+      'Are you sure you want to logout?',
+      () => {
+        console.log('🔄 User confirmed logout');
+        performLogout();
+      },
+      () => {
+        console.log('❌ Logout cancelled');
+      }
+    );
   };
 
   const performLogout = async () => {
     try {
-      console.log('🔄 Starting logout process...');
+      console.log('🔄 Starting logout process from profile...');
       await logout();
-      console.log('✅ Logout completed - auth state should trigger navigation');
+      console.log('✅ Logout completed - navigation should be handled by auth context');
+      // No need to manually navigate here - the auth context handles it
     } catch (error) {
       console.error('❌ Logout failed:', error);
+      // The auth context will handle showing error messages
     }
   };
 
   // Add loading state check
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Profile</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // If not authenticated, show redirecting message
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Redirecting to login...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // If authenticated but no user data loaded yet
   if (!user) {
     return (
       <SafeAreaView style={styles.container}>

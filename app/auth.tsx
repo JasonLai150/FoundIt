@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     SafeAreaView,
     StyleSheet,
     Text,
@@ -11,7 +10,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from './contexts/SupabaseAuthContext';
+import { showAlert } from './utils/alert';
 
 export default function AuthScreen() {
   const { login, register, isAuthenticated, navigationTrigger } = useAuth();
@@ -43,18 +43,18 @@ export default function AuthScreen() {
 
   const handleAuthentication = async () => {
     if (!formData.email || !formData.password) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      showAlert('Error', 'Please fill in all required fields');
       return;
     }
 
     if (isSignUp && !formData.name) {
-      Alert.alert('Error', 'Please enter your name');
+      showAlert('Error', 'Please enter your name');
       return;
     }
 
     // Validate password length
     if (formData.password.length < 6) {
-      Alert.alert('Password Too Short', 'Password must be at least 6 characters long');
+      showAlert('Password Too Short', 'Password must be at least 6 characters long');
       return;
     }
 
@@ -66,25 +66,19 @@ export default function AuthScreen() {
       if (isSignUp) {
         console.log('🔄 Attempting registration...');
         success = await register(formData.name, formData.email, formData.password, stayLoggedIn);
-        if (!success) {
-          // The AuthContext will now return specific error messages
-          // No need for a generic alert here
-        } else {
-          Alert.alert('Success', 'Account created successfully!');
-        }
+        console.log('📊 Registration result:', success);
       } else {
         console.log('🔄 Attempting login...');
         success = await login(formData.email, formData.password, stayLoggedIn);
         console.log('📊 Login result:', success);
-        if (!success) {
-          Alert.alert('Login Failed', 'Invalid email or password. Please try again.');
-        } else {
-          console.log('✅ Login successful! Auth screen will handle navigation...');
-        }
       }
     } catch (error) {
       console.error('Authentication error:', error);
-      Alert.alert('Error', 'An unexpected error occurred. Please check the console for details.');
+      showAlert(
+        '⚠️ Unexpected Error', 
+        'An unexpected error occurred during authentication.\n\nPlease try again or contact support if the problem persists.',
+        [{ text: 'OK', style: 'default' }]
+      );
     } finally {
       setIsLoading(false);
     }
@@ -99,8 +93,16 @@ export default function AuthScreen() {
     setStayLoggedIn(!stayLoggedIn);
   };
 
-  const goToFirebaseTest = () => {
-    router.push('/test-firebase' as any);
+  const testAlert = () => {
+    showAlert(
+      '🧪 Alert Test',
+      'This is a test alert to verify the Alert system is working properly.\n\nIf you see this, alerts are functional!',
+      [{ text: 'OK', style: 'default' }]
+    );
+  };
+
+  const goToSupabaseTest = () => {
+    router.push('/test-supabase' as any);
   };
 
   return (
@@ -177,9 +179,16 @@ export default function AuthScreen() {
 
           <TouchableOpacity
             style={styles.debugButton}
-            onPress={goToFirebaseTest}
+            onPress={goToSupabaseTest}
           >
-            <Text style={styles.debugText}>🔧 Test Firebase Connection</Text>
+            <Text style={styles.debugText}>🔧 Test Supabase Connection</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.debugButton}
+            onPress={testAlert}
+          >
+            <Text style={styles.debugText}>🧪 Test Alert System</Text>
           </TouchableOpacity>
         </View>
       </View>
