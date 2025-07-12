@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../contexts/SupabaseAuthContext';
 import { showAlert } from '../utils/alert';
@@ -44,8 +44,13 @@ export default function PersonalInfoSetup() {
   const [formData, setFormData] = useState({
     first_name: user?.first_name || '',
     last_name: user?.last_name || '',
-    dob: user?.dob || '',
-    location: user?.location || '',
+    // Split DOB into separate fields
+    birth_day: user?.dob ? user.dob.split('-')[2] : '',
+    birth_month: user?.dob ? user.dob.split('-')[1] : '',
+    birth_year: user?.dob ? user.dob.split('-')[0] : '',
+    // Split location into separate fields
+    city: user?.location ? user.location.split(',')[0]?.trim() : '',
+    state: user?.location ? user.location.split(',')[1]?.trim() : '',
     goal: user?.goal || 'searching' as 'recruiting' | 'searching' | 'investing' | 'other',
   });
 
@@ -58,12 +63,16 @@ export default function PersonalInfoSetup() {
       showAlert('Missing Information', 'Please enter your last name');
       return false;
     }
-    if (!formData.dob.trim()) {
-      showAlert('Missing Information', 'Please enter your date of birth');
+    if (!formData.birth_day || !formData.birth_month || !formData.birth_year) {
+      showAlert('Missing Information', 'Please enter your complete date of birth');
       return false;
     }
-    if (!formData.location.trim()) {
-      showAlert('Missing Information', 'Please enter your location');
+    if (!formData.city.trim()) {
+      showAlert('Missing Information', 'Please enter your city');
+      return false;
+    }
+    if (!formData.state.trim()) {
+      showAlert('Missing Information', 'Please enter your state/region');
       return false;
     }
     if (!formData.goal) {
@@ -71,15 +80,26 @@ export default function PersonalInfoSetup() {
       return false;
     }
 
-    // Validate date format (YYYY-MM-DD)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(formData.dob)) {
-      showAlert('Invalid Date', 'Please enter date in YYYY-MM-DD format (e.g., 1995-06-15)');
+    // Validate date components
+    const day = parseInt(formData.birth_day);
+    const month = parseInt(formData.birth_month);
+    const year = parseInt(formData.birth_year);
+
+    if (day < 1 || day > 31) {
+      showAlert('Invalid Date', 'Please enter a valid day (1-31)');
+      return false;
+    }
+    if (month < 1 || month > 12) {
+      showAlert('Invalid Date', 'Please enter a valid month (1-12)');
+      return false;
+    }
+    if (year < 1900 || year > new Date().getFullYear()) {
+      showAlert('Invalid Date', 'Please enter a valid year');
       return false;
     }
 
     // Validate age (must be at least 13 years old)
-    const birthDate = new Date(formData.dob);
+    const birthDate = new Date(year, month - 1, day);
     const today = new Date();
     const age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -97,11 +117,16 @@ export default function PersonalInfoSetup() {
 
     setIsLoading(true);
     try {
+      // Combine date components into YYYY-MM-DD format
+      const dob = `${formData.birth_year}-${formData.birth_month.padStart(2, '0')}-${formData.birth_day.padStart(2, '0')}`;
+      // Combine location components
+      const location = `${formData.city.trim()}, ${formData.state.trim()}`;
+
       const success = await updateUserProfile({
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
-        dob: formData.dob.trim(),
-        location: formData.location.trim(),
+        dob: dob,
+        location: location,
         goal: formData.goal,
       });
 
@@ -140,6 +165,7 @@ export default function PersonalInfoSetup() {
               value={formData.first_name}
               onChangeText={(text) => setFormData({ ...formData, first_name: text })}
               placeholder="Enter your first name"
+              placeholderTextColor="#666"
               autoCapitalize="words"
             />
           </View>
@@ -151,30 +177,64 @@ export default function PersonalInfoSetup() {
               value={formData.last_name}
               onChangeText={(text) => setFormData({ ...formData, last_name: text })}
               placeholder="Enter your last name"
+              placeholderTextColor="#666"
               autoCapitalize="words"
             />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Date of Birth *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.dob}
-              onChangeText={(text) => setFormData({ ...formData, dob: text })}
-              placeholder="YYYY-MM-DD (e.g., 1995-06-15)"
-              keyboardType="numeric"
-            />
+            <View style={styles.dateInputGroup}>
+              <TextInput
+                style={styles.dateInput}
+                value={formData.birth_day}
+                onChangeText={(text) => setFormData({ ...formData, birth_day: text })}
+                placeholder="DD"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+                maxLength={2}
+              />
+              <TextInput
+                style={styles.dateInput}
+                value={formData.birth_month}
+                onChangeText={(text) => setFormData({ ...formData, birth_month: text })}
+                placeholder="MM"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+                maxLength={2}
+              />
+              <TextInput
+                style={styles.dateInput}
+                value={formData.birth_year}
+                onChangeText={(text) => setFormData({ ...formData, birth_year: text })}
+                placeholder="YYYY"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+                maxLength={4}
+              />
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Location *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.location}
-              onChangeText={(text) => setFormData({ ...formData, location: text })}
-              placeholder="City, State/Country"
-              autoCapitalize="words"
-            />
+            <View style={styles.locationInputGroup}>
+              <TextInput
+                style={styles.locationInput}
+                value={formData.city}
+                onChangeText={(text) => setFormData({ ...formData, city: text })}
+                placeholder="City"
+                placeholderTextColor="#666"
+                autoCapitalize="words"
+              />
+              <TextInput
+                style={styles.locationInput}
+                value={formData.state}
+                onChangeText={(text) => setFormData({ ...formData, state: text })}
+                placeholder="State/Region"
+                placeholderTextColor="#666"
+                autoCapitalize="words"
+              />
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
@@ -297,7 +357,39 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#f0f0f0',
+    color: '#333',
+  },
+  dateInputGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  dateInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    backgroundColor: '#f0f0f0',
+    color: '#333',
+    textAlign: 'center',
+  },
+  locationInputGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  locationInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    backgroundColor: '#f0f0f0',
+    color: '#333',
   },
   goalOption: {
     borderWidth: 1,
@@ -307,7 +399,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#f0f0f0',
   },
   goalOptionSelected: {
     borderColor: '#FF5864',

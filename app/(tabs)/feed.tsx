@@ -17,7 +17,7 @@ import { useFeedViewModel } from '../viewmodels/FeedViewModel';
 const { height: screenHeight } = Dimensions.get('window');
 
 export default function FeedScreen() {
-  const { developer, loading, error, swipeLeft, swipeRight, noMoreDevelopers } = useFeedViewModel();
+  const { developer, loading, error, swipeLeft, swipeRight, noMoreDevelopers, refreshProfiles, totalProfiles, currentIndex } = useFeedViewModel();
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -30,14 +30,41 @@ export default function FeedScreen() {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    // TODO: Implement search functionality
+    
+    // Implement search by refreshing profiles with search query
+    if (query.trim()) {
+      // Add search to filters and refresh
+      refreshProfiles({ 
+        location: query.trim(), // Search in location for now
+        // TODO: Could extend to search in bio, skills, company, etc.
+      });
+    } else {
+      // Clear search - refresh with current filters only
+      const matchmakingFilters = {
+        location: filters.location || undefined,
+        experienceMin: filters.experienceMin ? parseInt(filters.experienceMin) : undefined,
+        experienceMax: filters.experienceMax ? parseInt(filters.experienceMax) : undefined,
+        lookingForWork: filters.lookingForWork,
+      };
+      refreshProfiles(matchmakingFilters);
+    }
+    
     console.log('Searching for:', query);
   };
 
   const applyFilters = () => {
     setShowFilters(false);
-    // TODO: Implement filter functionality
-    console.log('Applying filters:', filters);
+    // Convert UI filters to MatchmakingFilters format
+    const matchmakingFilters = {
+      location: filters.location || undefined,
+      experienceMin: filters.experienceMin ? parseInt(filters.experienceMin) : undefined,
+      experienceMax: filters.experienceMax ? parseInt(filters.experienceMax) : undefined,
+      lookingForWork: filters.lookingForWork,
+    };
+    
+    // Use the new refresh functionality
+    refreshProfiles(matchmakingFilters);
+    console.log('Applying filters:', matchmakingFilters);
   };
 
   const resetFilters = () => {
@@ -48,12 +75,21 @@ export default function FeedScreen() {
       skills: '',
       lookingForWork: false,
     });
+    // Refresh with no filters
+    refreshProfiles({});
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Discover</Text>
+        
+        {/* Debug info - can be removed later */}
+        {totalProfiles > 0 && (
+          <Text style={styles.debugText}>
+            Profile {currentIndex} of {totalProfiles}
+          </Text>
+        )}
         
         {/* Search Bar Section - Airbnb Style */}
         <View style={styles.searchSection}>
@@ -194,6 +230,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#333',
     letterSpacing: -0.5,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    textAlign: 'center',
   },
   content: {
     flex: 1,

@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from '../contexts/SupabaseAuthContext';
 
@@ -22,18 +22,23 @@ interface WorkExperience {
   current: boolean;
 }
 
+interface Education {
+  school_name: string;
+  degree: string;
+  major: string;
+}
+
 export default function ProfessionalSetup() {
   const { createUserExperience, user } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    schools: [] as string[], // Changed from single school to array of schools
     graduation_date: '',
     skills: [] as string[],
   });
+  const [education, setEducation] = useState<Education[]>([]);
   const [workExperiences, setWorkExperiences] = useState<WorkExperience[]>([]);
   const [newSkill, setNewSkill] = useState('');
-  const [newSchool, setNewSchool] = useState('');
 
   const addSkill = () => {
     if (newSkill.trim() && !formData.skills.includes(newSkill.trim())) {
@@ -52,21 +57,22 @@ export default function ProfessionalSetup() {
     });
   };
 
-  const addSchool = () => {
-    if (newSchool.trim() && !formData.schools.includes(newSchool.trim())) {
-      setFormData({
-        ...formData,
-        schools: [...formData.schools, newSchool.trim()]
-      });
-      setNewSchool('');
-    }
+  const addEducation = () => {
+    setEducation([...education, {
+      school_name: '',
+      degree: '',
+      major: ''
+    }]);
   };
 
-  const removeSchool = (schoolToRemove: string) => {
-    setFormData({
-      ...formData,
-      schools: formData.schools.filter(school => school !== schoolToRemove)
-    });
+  const updateEducation = (index: number, field: keyof Education, value: string) => {
+    const updated = [...education];
+    updated[index] = { ...updated[index], [field]: value };
+    setEducation(updated);
+  };
+
+  const removeEducation = (index: number) => {
+    setEducation(education.filter((_, i) => i !== index));
   };
 
   const addWorkExperience = () => {
@@ -83,6 +89,12 @@ export default function ProfessionalSetup() {
   const updateWorkExperience = (index: number, field: keyof WorkExperience, value: string | boolean) => {
     const updated = [...workExperiences];
     updated[index] = { ...updated[index], [field]: value };
+    
+    // Clear end date when "current" is set to true
+    if (field === 'current' && value === true) {
+      updated[index].endDate = '';
+    }
+    
     setWorkExperiences(updated);
   };
 
@@ -100,7 +112,7 @@ export default function ProfessionalSetup() {
 
       const success = await createUserExperience({
         profile_id: user!.id,
-        school: formData.schools.length > 0 ? formData.schools : undefined,
+        education: education.length > 0 ? education : undefined,
         graduation_date: formData.graduation_date.trim() || undefined,
         skills: formData.skills.length > 0 ? formData.skills : undefined,
         work_experience: validWorkExperiences.length > 0 ? validWorkExperiences : undefined,
@@ -144,43 +156,68 @@ export default function ProfessionalSetup() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Schools</Text>
-            <View style={styles.skillsContainer}>
-              {formData.schools.map((school, index) => (
-                <View key={index} style={styles.skillTag}>
-                  <Text style={styles.skillText}>{school}</Text>
-                  <TouchableOpacity
-                    onPress={() => removeSchool(school)}
-                    style={styles.skillRemove}
-                  >
-                    <Ionicons name="close" size={16} color="#666" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-            <View style={styles.skillInputContainer}>
-              <TextInput
-                style={styles.skillInput}
-                value={newSchool}
-                onChangeText={setNewSchool}
-                placeholder="Add a school (e.g., MIT, Stanford)"
-                onSubmitEditing={addSchool}
-                returnKeyType="done"
-              />
-              <TouchableOpacity onPress={addSchool} style={styles.addSkillButton}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.label}>Education</Text>
+              <TouchableOpacity onPress={addEducation} style={styles.addButton}>
                 <Ionicons name="add" size={20} color="#FF5864" />
+                <Text style={styles.addButtonText}>Add Education</Text>
               </TouchableOpacity>
             </View>
-          </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Graduation Date</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.graduation_date}
-              onChangeText={(text) => setFormData({ ...formData, graduation_date: text })}
-              placeholder="YYYY-MM-DD or 'Currently attending'"
-            />
+            {education.map((edu, index) => (
+              <View key={index} style={styles.experienceCard}>
+                <View style={styles.experienceHeader}>
+                  <Text style={styles.experienceTitle}>Education {index + 1}</Text>
+                  <TouchableOpacity
+                    onPress={() => removeEducation(index)}
+                    style={styles.removeButton}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#FF5864" />
+                  </TouchableOpacity>
+                </View>
+
+                <TextInput
+                  style={styles.input}
+                  value={edu.school_name}
+                  onChangeText={(text) => updateEducation(index, 'school_name', text)}
+                  placeholder="School name (e.g., MIT, Stanford)"
+                  placeholderTextColor="#666"
+                  autoCapitalize="words"
+                />
+
+                <TextInput
+                  style={styles.input}
+                  value={edu.degree}
+                  onChangeText={(text) => updateEducation(index, 'degree', text)}
+                  placeholder="Degree (e.g., Bachelor of Science, Master of Arts)"
+                  placeholderTextColor="#666"
+                  autoCapitalize="words"
+                />
+
+                <TextInput
+                  style={styles.input}
+                  value={edu.major}
+                  onChangeText={(text) => updateEducation(index, 'major', text)}
+                  placeholder="Major/Field of Study (e.g., Computer Science)"
+                  placeholderTextColor="#666"
+                  autoCapitalize="words"
+                />
+              </View>
+            ))}
+
+            {/* Show graduation date only if education is added */}
+            {education.length > 0 && (
+              <View style={styles.graduationContainer}>
+                <Text style={styles.label}>Graduation Date</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.graduation_date}
+                  onChangeText={(text) => setFormData({ ...formData, graduation_date: text })}
+                  placeholder="YYYY-MM-DD or 'Currently attending'"
+                  placeholderTextColor="#666"
+                />
+              </View>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
@@ -203,7 +240,8 @@ export default function ProfessionalSetup() {
                 style={styles.skillInput}
                 value={newSkill}
                 onChangeText={setNewSkill}
-                placeholder="Add a skill (e.g., React, Python, Design)"
+                placeholder="Add a skill (e.g., React, Python, AWS)"
+                placeholderTextColor="#666"
                 onSubmitEditing={addSkill}
                 returnKeyType="done"
               />
@@ -239,6 +277,7 @@ export default function ProfessionalSetup() {
                   value={experience.company}
                   onChangeText={(text) => updateWorkExperience(index, 'company', text)}
                   placeholder="Company name"
+                  placeholderTextColor="#666"
                   autoCapitalize="words"
                 />
 
@@ -247,6 +286,7 @@ export default function ProfessionalSetup() {
                   value={experience.position}
                   onChangeText={(text) => updateWorkExperience(index, 'position', text)}
                   placeholder="Position/Role"
+                  placeholderTextColor="#666"
                   autoCapitalize="words"
                 />
 
@@ -255,6 +295,7 @@ export default function ProfessionalSetup() {
                   value={experience.description}
                   onChangeText={(text) => updateWorkExperience(index, 'description', text)}
                   placeholder="Description of your role and achievements"
+                  placeholderTextColor="#666"
                   multiline
                   numberOfLines={3}
                 />
@@ -265,12 +306,18 @@ export default function ProfessionalSetup() {
                     value={experience.startDate}
                     onChangeText={(text) => updateWorkExperience(index, 'startDate', text)}
                     placeholder="Start (YYYY-MM)"
+                    placeholderTextColor="#666"
                   />
                   <TextInput
-                    style={[styles.input, styles.dateInput]}
-                    value={experience.endDate}
+                    style={[
+                      styles.input, 
+                      styles.dateInput,
+                      experience.current && styles.disabledInput
+                    ]}
+                    value={experience.current ? 'Present' : experience.endDate}
                     onChangeText={(text) => updateWorkExperience(index, 'endDate', text)}
-                    placeholder="End (YYYY-MM)"
+                    placeholder={experience.current ? 'Present' : 'End (YYYY-MM)'}
+                    placeholderTextColor="#666"
                     editable={!experience.current}
                   />
                 </View>
@@ -384,7 +431,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#f0f0f0',
+    color: '#333',
     marginBottom: 12,
   },
   textArea: {
@@ -425,7 +473,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#f0f0f0',
+    color: '#333',
     marginRight: 12,
   },
   addSkillButton: {
@@ -453,7 +502,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   experienceCard: {
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#f0f0f0',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -479,6 +528,11 @@ const styles = StyleSheet.create({
   dateInput: {
     flex: 1,
   },
+  disabledInput: {
+    color: '#999',
+    backgroundColor: '#e8e8e8',
+    cursor: 'not-allowed',
+  },
   currentJobContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -502,6 +556,9 @@ const styles = StyleSheet.create({
   currentJobText: {
     fontSize: 14,
     color: '#333',
+  },
+  graduationContainer: {
+    marginTop: 24,
   },
   footer: {
     flexDirection: 'row',

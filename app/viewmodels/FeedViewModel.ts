@@ -1,89 +1,57 @@
 import { useEffect, useState } from 'react';
-import { Developer, Skill } from '../models/Developer';
-
-// Sample data for initial testing
-const mockSkills: Skill[] = [
-  { id: '1', name: 'React', level: 'Expert' },
-  { id: '2', name: 'TypeScript', level: 'Advanced' },
-  { id: '3', name: 'Node.js', level: 'Intermediate' },
-  { id: '4', name: 'Python', level: 'Advanced' },
-  { id: '5', name: 'AWS', level: 'Intermediate' },
-  { id: '6', name: 'Docker', level: 'Beginner' },
-];
-
-const mockDevelopers: Developer[] = [
-  {
-    id: '1',
-    name: 'Jane Doe',
-    bio: 'Full stack developer with 5 years of experience. Passionate about clean code and user experience. I love building scalable web applications and mentoring junior developers.',
-    role: 'Full Stack Developer',
-    skills: [mockSkills[0], mockSkills[1], mockSkills[2]],
-    looking: true,
-    location: 'San Francisco, CA',
-    experience: 5,
-    company: 'Tech Startup Inc.',
-    education: 'BS Computer Science, Stanford',
-    github: 'github.com/janedoe',
-    linkedin: 'linkedin.com/in/janedoe',
-    website: 'janedoe.dev',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face',
-  },
-  {
-    id: '2',
-    name: 'John Smith',
-    bio: 'Backend developer specializing in Python and cloud infrastructure. Looking for frontend collaborators to build amazing products together.',
-    role: 'Backend Developer',
-    skills: [mockSkills[3], mockSkills[4], mockSkills[5]],
-    looking: true,
-    location: 'New York, NY',
-    experience: 3,
-    company: 'CloudSoft Solutions',
-    education: 'MS Software Engineering, MIT',
-    github: 'github.com/johnsmith',
-    linkedin: 'linkedin.com/in/johnsmith',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face',
-  },
-  {
-    id: '3',
-    name: 'Alex Chen',
-    bio: 'Mobile app developer with expertise in React Native and Flutter. Passionate about creating intuitive user interfaces and performance optimization.',
-    role: 'Mobile Developer',
-    skills: [mockSkills[0], mockSkills[1], { id: '7', name: 'Flutter', level: 'Advanced' }, { id: '8', name: 'iOS', level: 'Intermediate' }],
-    looking: true,
-    location: 'Seattle, WA',
-    experience: 4,
-    company: 'AppCraft Studios',
-    education: 'BS Computer Engineering, UC Berkeley',
-    github: 'github.com/alexchen',
-    linkedin: 'linkedin.com/in/alexchen',
-    website: 'alexchen.tech',
-    avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face',
-  },
-];
+import { useAuth } from '../contexts/SupabaseAuthContext';
+import { Developer } from '../models/Developer';
+import { MatchmakingFilters, matchmakingService } from '../services/MatchmakingService';
+import { matchService } from '../services/MatchService';
 
 export const useFeedViewModel = () => {
+  const { user } = useAuth();
   const [developers, setDevelopers] = useState<Developer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [hasMoreProfiles, setHasMoreProfiles] = useState<boolean>(true);
 
-  // In a real app, this would fetch from an API
+  // Fetch developers from database using matchmaking service
   useEffect(() => {
-    // Simulate API call
     const fetchDevelopers = async () => {
       try {
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setDevelopers(mockDevelopers);
-        setLoading(false);
-      } catch (err) {
-        setError('Failed to load developers');
+        setLoading(true);
+        setError(null);
+
+        // Need authenticated user to fetch matches
+        if (!user?.id || !user?.goal) {
+          console.log('⏳ Waiting for user data to load...');
+          setLoading(false);
+          return;
+        }
+
+        console.log('🔄 Fetching matched profiles for user:', user.id, 'goal:', user.goal);
+
+        // Use matchmaking service to get prioritized profiles
+        const matchResult = await matchmakingService.getMatchedProfiles(
+          user.id,
+          user.goal,
+          {}, // No additional filters for now
+          50  // Fetch up to 50 profiles
+        );
+
+        console.log('✅ Fetched', matchResult.profiles.length, 'matched profiles');
+        
+        setDevelopers(matchResult.profiles);
+        setHasMoreProfiles(matchResult.hasMore);
+        setCurrentIndex(0); // Reset to first profile
+        
+      } catch (err: any) {
+        console.error('❌ Error fetching developers:', err);
+        setError('Failed to load developers. Please try again.');
+      } finally {
         setLoading(false);
       }
     };
 
     fetchDevelopers();
-  }, []);
+  }, [user?.id, user?.goal]); // Re-fetch when user data changes
 
   const getCurrentDeveloper = (): Developer | null => {
     if (developers.length === 0 || currentIndex >= developers.length) {
@@ -92,19 +60,108 @@ export const useFeedViewModel = () => {
     return developers[currentIndex];
   };
 
-  const swipeLeft = () => {
-    // Swipe left (not interested)
-    if (currentIndex < developers.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+  const swipeLeft = async () => {
+    // Prevent rapid swipes during async operations
+    if (loading) return;
+    
+    // Capture current state before any updates
+    const currentDeveloper = developers[currentIndex];
+    const nextIndex = currentIndex + 1;
+    
+    console.log(`👎 Passed on: ${currentDeveloper?.name} (index: ${currentIndex})`);
+    
+    // Update index immediately to prevent race conditions
+    if (nextIndex < developers.length) {
+      setCurrentIndex(nextIndex);
+    } else {
+      console.log('📭 No more profiles to show');
+    }
+    
+    // Record the pass action (async, but index is already updated)
+    if (user?.id && currentDeveloper?.id) {
+      try {
+        const success = await matchService.recordPass(user.id, currentDeveloper.id);
+        if (success) {
+          console.log('✅ Pass recorded successfully for:', currentDeveloper.name);
+        } else {
+          console.log('⚠️ Failed to record pass for:', currentDeveloper.name);
+        }
+      } catch (error) {
+        console.error('❌ Error recording pass:', error);
+      }
     }
   };
 
-  const swipeRight = () => {
-    // Swipe right (interested)
-    // In a real app, you would save this match to a database
-    console.log(`Liked developer: ${developers[currentIndex].name}`);
-    if (currentIndex < developers.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+  const swipeRight = async () => {
+    // Prevent rapid swipes during async operations
+    if (loading) return;
+    
+    // Capture current state before any updates
+    const currentDeveloper = developers[currentIndex];
+    const nextIndex = currentIndex + 1;
+    
+    console.log(`❤️ Liked developer: ${currentDeveloper?.name} (index: ${currentIndex})`);
+    
+    // Update index immediately to prevent race conditions
+    if (nextIndex < developers.length) {
+      setCurrentIndex(nextIndex);
+    } else {
+      console.log('📭 No more profiles to show');
+    }
+    
+    // Save this like to the database (async, but index is already updated)
+    if (user?.id && currentDeveloper?.id) {
+      try {
+        const success = await matchService.createMatch(user.id, currentDeveloper.id);
+        if (success) {
+          console.log('✅ Like recorded successfully for:', currentDeveloper.name);
+        } else {
+          console.log('⚠️ Failed to record like for:', currentDeveloper.name);
+        }
+      } catch (error) {
+        console.error('❌ Error recording like:', error);
+      }
+    }
+  };
+
+  const refreshProfiles = async (filters?: MatchmakingFilters) => {
+    // Allow manual refresh with optional filters
+    if (!user?.id || !user?.goal) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const matchResult = await matchmakingService.getMatchedProfiles(
+        user.id,
+        user.goal,
+        filters || {},
+        50
+      );
+      
+      setDevelopers(matchResult.profiles);
+      setHasMoreProfiles(matchResult.hasMore);
+      setCurrentIndex(0);
+      
+    } catch (err: any) {
+      console.error('❌ Error refreshing profiles:', err);
+      setError('Failed to refresh profiles. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadMoreProfiles = async () => {
+    // Load additional profiles (for future pagination)
+    if (!hasMoreProfiles || !user?.id || !user?.goal) return;
+    
+    try {
+      // TODO: Implement pagination logic
+      // This would involve tracking offset/cursor and appending new profiles
+      console.log('🔄 Loading more profiles...');
+      
+    } catch (err: any) {
+      console.error('❌ Error loading more profiles:', err);
     }
   };
 
@@ -114,6 +171,11 @@ export const useFeedViewModel = () => {
     error,
     swipeLeft,
     swipeRight,
+    refreshProfiles,
+    loadMoreProfiles,
     noMoreDevelopers: currentIndex >= developers.length,
+    hasMoreProfiles,
+    totalProfiles: developers.length,
+    currentIndex: currentIndex + 1, // 1-based for UI display
   };
 }; 

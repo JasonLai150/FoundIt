@@ -26,7 +26,11 @@ interface User {
 interface Experience {
   id?: string;
   profile_id: string;
-  school?: string[]; // Array of schools to match database schema
+  education?: {
+    school_name: string;
+    degree?: string;
+    major?: string;
+  }[];
   work_experience?: any; // JSON field
   skills?: string[];
   graduation_date?: string;
@@ -357,12 +361,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const { error: profileError } = await supabase
             .from('profiles')
-            .insert({
+            .upsert({
               id: data.user.id,
               email: data.user.email!,
               profile_complete: false,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
+            }, {
+              onConflict: 'id',
+              ignoreDuplicates: false
             });
           
           if (profileError) {

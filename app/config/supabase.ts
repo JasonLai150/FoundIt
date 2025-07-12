@@ -74,7 +74,11 @@ export interface Database {
         Row: {
           id: string
           profile_id: string
-          school?: string[]
+          education?: {
+            school_name: string
+            degree?: string
+            major?: string
+          }[]
           work_experience?: any
           skills?: string[]
           graduation_date?: string
@@ -82,7 +86,11 @@ export interface Database {
         }
         Insert: {
           profile_id: string
-          school?: string[]
+          education?: {
+            school_name: string
+            degree?: string
+            major?: string
+          }[]
           work_experience?: any
           skills?: string[]
           graduation_date?: string
@@ -90,7 +98,11 @@ export interface Database {
         Update: {
           id?: string
           profile_id?: string
-          school?: string[]
+          education?: {
+            school_name: string
+            degree?: string
+            major?: string
+          }[]
           work_experience?: any
           skills?: string[]
           graduation_date?: string

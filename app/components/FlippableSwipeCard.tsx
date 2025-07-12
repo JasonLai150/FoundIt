@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import {
@@ -222,6 +223,55 @@ export default function FlippableSwipeCard({
     rotateZ.setValue(0);
   };
 
+  // Add animated button press handlers
+  const handlePassPress = () => {
+    // Animate card to the left like a swipe
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: -screenWidth,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: screenHeight * 0.3,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rotateZ, {
+        toValue: -1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onSwipeLeft();
+      resetPosition();
+    });
+  };
+
+  const handleConnectPress = () => {
+    // Animate card to the right like a swipe
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: screenWidth,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: screenHeight * 0.3,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rotateZ, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onSwipeRight();
+      resetPosition();
+    });
+  };
+
   const cardAnimatedStyle = {
     transform: [
       { translateX },
@@ -393,13 +443,15 @@ export default function FlippableSwipeCard({
       
       {/* Swipe indicators */}
       <View style={styles.swipeIndicators}>
-        <View style={styles.swipeHint}>
-          <Ionicons name="close" size={24} color="#ff4d4d" />
-          <Text style={styles.swipeHintText}>Pass</Text>
-        </View>
-        <View style={styles.swipeHint}>
-          <Text style={styles.swipeHintText}>Connect</Text>
-          <Ionicons name="heart" size={24} color="#4dd964" />
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity onPress={handlePassPress} style={[styles.swipeButton, styles.passButton]}>
+            <Ionicons name="close" size={20} color="#ff6b6b" />
+            <Text style={[styles.swipeButtonText, styles.passButtonText]}>Pass</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleConnectPress} style={[styles.swipeButton, styles.connectButton]}>
+            <Ionicons name="heart" size={20} color="#51cf66" />
+            <Text style={[styles.swipeButtonText, styles.connectButtonText]}>Connect</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -661,20 +713,64 @@ const styles = StyleSheet.create({
   // Swipe Indicators
   swipeIndicators: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 40,
+    justifyContent: 'center', // Center the buttons
+    paddingHorizontal: 30,
     marginTop: 16,
     width: '100%',
+    gap: 16,
   },
-  swipeHint: {
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swipeButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    minWidth: 90,
     gap: 6,
+    // Add hover/active states for web
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+      },
+    }),
   },
-  swipeHintText: {
-    fontSize: 14,
+  swipeButtonInner: {
+    alignItems: 'center',
+  },
+  swipeButtonText: {
+    fontSize: 12,
     color: '#666',
     fontWeight: '500',
+  },
+  passButton: {
+    borderColor: '#ff6b6b',
+    backgroundColor: '#fff5f5',
+  },
+  connectButton: {
+    borderColor: '#51cf66',
+    backgroundColor: '#f0fdf4',
+  },
+  passButtonText: {
+    color: '#ff6b6b',
+  },
+  connectButtonText: {
+    color: '#51cf66',
   },
 
   // Dynamic Blur
