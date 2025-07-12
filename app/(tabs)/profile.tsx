@@ -118,9 +118,27 @@ export default function ProfileScreen() {
             </View>
           </View>
           
-          <Text style={styles.name}>{user.name || 'Your Name'}</Text>
+          <Text style={styles.name}>{user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : 'Your Name'}</Text>
           <Text style={styles.email}>{user.email || 'your.email@example.com'}</Text>
           <Text style={styles.role}>{user.role || 'Full Stack Developer'}</Text>
+          
+          {user.goal && (
+            <View style={styles.goalContainer}>
+              <Text style={styles.goalLabel}>Goal:</Text>
+              <Text style={styles.goalText}>
+                {user.goal === 'searching' ? 'Job Searching' :
+                 user.goal === 'recruiting' ? 'Recruiting' :
+                 user.goal === 'investing' ? 'Investing' : 'Networking'}
+              </Text>
+            </View>
+          )}
+
+          {user.location && (
+            <View style={styles.locationContainer}>
+              <Ionicons name="location-outline" size={16} color="#666" />
+              <Text style={styles.locationText}>{user.location}</Text>
+            </View>
+          )}
           
           <View style={styles.infoSection}>
             <Text style={styles.sectionTitle}>About Me</Text>
@@ -128,45 +146,37 @@ export default function ProfileScreen() {
               {user.bio || 'Share information about your skills, experience, and what kind of developers you\'re looking to connect with.'}
             </Text>
           </View>
-          
-          <View style={styles.infoSection}>
-            <Text style={styles.sectionTitle}>Skills</Text>
-            <View style={styles.skillsContainer}>
-              {user.skills && user.skills.length > 0 ? (
-                user.skills.map((skill, index) => (
-                  <View key={index} style={styles.skillBadge}>
-                    <Text style={styles.skillText}>{skill}</Text>
-                  </View>
-                ))
-              ) : (
-                <>
-                  <View style={styles.skillBadge}>
-                    <Text style={styles.skillText}>React</Text>
-                  </View>
-                  <View style={styles.skillBadge}>
-                    <Text style={styles.skillText}>Node.js</Text>
-                  </View>
-                  <View style={styles.skillBadge}>
-                    <Text style={styles.skillText}>TypeScript</Text>
-                  </View>
-                </>
-              )}
-            </View>
-          </View>
 
-          {user.location && (
+          {user.github || user.linkedin || user.website ? (
             <View style={styles.infoSection}>
-              <Text style={styles.sectionTitle}>Location</Text>
-              <Text style={styles.infoText}>{user.location}</Text>
+              <Text style={styles.sectionTitle}>Connect</Text>
+              <View style={styles.socialLinks}>
+                {user.github && (
+                  <TouchableOpacity style={styles.socialLink}>
+                    <Ionicons name="logo-github" size={20} color="#333" />
+                    <Text style={styles.socialText}>GitHub</Text>
+                  </TouchableOpacity>
+                )}
+                {user.linkedin && (
+                  <TouchableOpacity style={styles.socialLink}>
+                    <Ionicons name="logo-linkedin" size={20} color="#0077B5" />
+                    <Text style={styles.socialText}>LinkedIn</Text>
+                  </TouchableOpacity>
+                )}
+                {user.website && (
+                  <TouchableOpacity style={styles.socialLink}>
+                    <Ionicons name="globe-outline" size={20} color="#333" />
+                    <Text style={styles.socialText}>Website</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-          )}
+          ) : null}
 
-          {user.experience !== undefined && user.experience !== null && (
-            <View style={styles.infoSection}>
-              <Text style={styles.sectionTitle}>Experience</Text>
-              <Text style={styles.infoText}>{user.experience.toString()} years</Text>
-            </View>
-          )}
+          <TouchableOpacity style={styles.editProfileButton}>
+            <Ionicons name="create-outline" size={20} color="#FF5864" />
+            <Text style={styles.editProfileText}>Edit Profile</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -235,6 +245,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
+  goalContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  goalLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 5,
+  },
+  goalText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FF5864',
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 5,
+  },
   infoSection: {
     marginBottom: 20,
   },
@@ -253,21 +290,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  skillsContainer: {
+  socialLinks: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    marginTop: 10,
   },
-  skillBadge: {
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginRight: 8,
-    marginBottom: 8,
+  socialLink: {
+    alignItems: 'center',
+    marginHorizontal: 10,
   },
-  skillText: {
-    fontSize: 14,
+  socialText: {
+    fontSize: 12,
     color: '#333',
+    marginTop: 5,
+  },
+  editProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF5864',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginTop: 20,
+  },
+  editProfileText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
   },
   loadingContainer: {
     flex: 1,

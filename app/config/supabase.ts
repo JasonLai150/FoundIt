@@ -22,49 +22,78 @@ export interface Database {
         Row: {
           id: string
           email: string
-          name: string
+          first_name?: string
+          last_name?: string
+          dob?: string
+          location?: string
+          goal?: 'recruiting' | 'searching' | 'investing' | 'other'
           role?: string
           bio?: string
-          skills?: string[]
-          location?: string
-          experience?: number
           github?: string
           linkedin?: string
           website?: string
-          looking?: boolean
           avatar_url?: string
+          profile_complete?: boolean
           created_at: string
           updated_at: string
         }
         Insert: {
           id: string
           email: string
-          name: string
+          first_name?: string
+          last_name?: string
+          dob?: string
+          location?: string
+          goal?: 'recruiting' | 'searching' | 'investing' | 'other'
           role?: string
           bio?: string
-          skills?: string[]
-          location?: string
-          experience?: number
           github?: string
           linkedin?: string
           website?: string
-          looking?: boolean
           avatar_url?: string
+          profile_complete?: boolean
         }
         Update: {
           id?: string
           email?: string
-          name?: string
+          first_name?: string
+          last_name?: string
+          dob?: string
+          location?: string
+          goal?: 'recruiting' | 'searching' | 'investing' | 'other'
           role?: string
           bio?: string
-          skills?: string[]
-          location?: string
-          experience?: number
           github?: string
           linkedin?: string
           website?: string
-          looking?: boolean
           avatar_url?: string
+          profile_complete?: boolean
+        }
+      }
+      experience: {
+        Row: {
+          id: string
+          profile_id: string
+          school?: string[]
+          work_experience?: any
+          skills?: string[]
+          graduation_date?: string
+          created_at: string
+        }
+        Insert: {
+          profile_id: string
+          school?: string[]
+          work_experience?: any
+          skills?: string[]
+          graduation_date?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          school?: string[]
+          work_experience?: any
+          skills?: string[]
+          graduation_date?: string
         }
       }
     }

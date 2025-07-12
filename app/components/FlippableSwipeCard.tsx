@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useRef, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -26,24 +27,19 @@ interface FlippableSwipeCardProps {
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-// Better mobile responsiveness - account for safe areas and navigation
 const getCardDimensions = () => {
-  const isSmallScreen = screenHeight < 700; // iPhone SE, etc.
-  const isVerySmallScreen = screenHeight < 600;
+  const cardWidth = screenWidth * 0.92; // Slightly more width usage for mobile
   
-  const cardWidth = Math.min(screenWidth - 32, 400); // Max width with padding
+  // Calculate available height after UI elements
+  // SafeAreaView + Header + Search + Content padding + Tab bar ≈ 250-280px
+  const uiSpaceEstimate = Platform.OS === 'ios' ? 270 : 250;
+  const availableHeight = screenHeight - uiSpaceEstimate;
   
-  let cardHeight;
-  if (isVerySmallScreen) {
-    cardHeight = screenHeight * 0.55; // Smaller for very small screens
-  } else if (isSmallScreen) {
-    cardHeight = screenHeight * 0.6; // Smaller for small screens
-  } else {
-    cardHeight = screenHeight * 0.65; // Standard for larger screens
-  }
-  
-  // Ensure minimum usable height
-  cardHeight = Math.max(cardHeight, 480);
+  // Use 88% of available height, with min/max constraints
+  const cardHeight = Math.min(
+    Math.max(availableHeight * 0.88, 430), // Min 430px
+    screenHeight * 0.70 // Max 70% of screen height
+  );
   
   return { cardWidth, cardHeight };
 };
@@ -52,10 +48,26 @@ const { cardWidth: CARD_WIDTH, cardHeight: CARD_HEIGHT } = getCardDimensions();
 const SWIPE_THRESHOLD = 120;
 const isSmallScreen = screenHeight < 700;
 
-const SkillBadge = ({ skill }: { skill: Skill }) => (
-  <View style={styles.skillBadge}>
-    <Text style={styles.skillText}>{skill.name}</Text>
-    <Text style={styles.skillLevel}>{skill.level}</Text>
+// Generate dynamic gradient colors based on developer role
+const getRoleGradient = (role: string): [string, string] => {
+  const gradients: Record<string, [string, string]> = {
+    'Frontend Developer': ['#667eea', '#764ba2'],
+    'Backend Developer': ['#f093fb', '#f5576c'],
+    'Full Stack Developer': ['#4facfe', '#00f2fe'],
+    'Mobile Developer': ['#43e97b', '#38f9d7'],
+    'DevOps Engineer': ['#fa709a', '#fee140'],
+    'Data Scientist': ['#a8edea', '#fed6e3'],
+    'UI/UX Designer': ['#ffecd2', '#fcb69f'],
+    'Software Engineer': ['#667eea', '#764ba2'],
+    default: ['#667eea', '#764ba2']
+  };
+  
+  return gradients[role] || gradients.default;
+};
+
+const SkillBadge = ({ skill, isTopSkill = false }: { skill: Skill; isTopSkill?: boolean }) => (
+  <View style={[styles.skillBadge, isTopSkill && styles.topSkillBadge]}>
+    <Text style={[styles.skillText, isTopSkill && styles.topSkillText]}>{skill.name}</Text>
   </View>
 );
 
@@ -65,19 +77,25 @@ export default function FlippableSwipeCard({
   onSwipeRight 
 }: FlippableSwipeCardProps) {
   const [scrollY, setScrollY] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [scrollViewHeight, setScrollViewHeight] = useState(0);
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const rotateZ = useRef(new Animated.Value(0)).current;
-  const scrollIndicatorOpacity = useRef(new Animated.Value(1)).current;
 
-  // Hide scroll indicator when scrolled
-  useEffect(() => {
-    Animated.timing(scrollIndicatorOpacity, {
-      toValue: scrollY > 50 ? 0 : 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [scrollY]);
+  // Calculate blur opacity based on distance from bottom
+  const getBlurOpacity = () => {
+    if (contentHeight === 0 || scrollViewHeight === 0) return 1;
+    
+    const distanceFromBottom = contentHeight - scrollY - scrollViewHeight;
+    const fadeThreshold = 100; // Start fading when 100px from bottom
+    
+    if (distanceFromBottom <= 0) return 0; // At bottom
+    if (distanceFromBottom >= fadeThreshold) return 1; // Far from bottom
+    
+    // Fade out as we approach bottom
+    return distanceFromBottom / fadeThreshold;
+  };
 
   const handleSwipeEnd = (translationX: number) => {
     if (translationX > SWIPE_THRESHOLD) {
@@ -157,7 +175,7 @@ export default function FlippableSwipeCard({
       onPanResponderMove: (_, gestureState) => {
         translateX.setValue(gestureState.dx);
         
-        // Calculate fixed motion path
+        // Calculate rotation and vertical movement
         const progress = Math.abs(gestureState.dx) / SWIPE_THRESHOLD;
         const clampedProgress = Math.min(progress, 1);
         const downwardOffset = clampedProgress * 50;
@@ -188,14 +206,9 @@ export default function FlippableSwipeCard({
     if (event.nativeEvent.state === State.END) {
       handleSwipeEnd(event.nativeEvent.translationX);
     } else {
-      // During dragging, create fixed motion path based on X translation only
       const progress = Math.abs(event.nativeEvent.translationX) / SWIPE_THRESHOLD;
       const clampedProgress = Math.min(progress, 1);
-      
-      // Fixed downward motion that increases with horizontal movement
       const downwardOffset = clampedProgress * 50;
-      
-      // Fixed rotation based on direction and progress
       const rotationValue = (event.nativeEvent.translationX / SWIPE_THRESHOLD) * 0.3;
       
       translateY.setValue(downwardOffset);
@@ -222,157 +235,171 @@ export default function FlippableSwipeCard({
     ],
   };
 
-  const renderScrollableCard = () => (
+  const gradientColors = getRoleGradient(developer.role);
+
+  const renderTradingCard = () => (
     <View style={styles.card}>
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        onScroll={(event) => {
-          setScrollY(event.nativeEvent.contentOffset.y);
-        }}
-        scrollEventThrottle={16}
+      {/* Top Half - Profile Section with Gradient */}
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.profileSection}
       >
-        {/* Initial view content - Tinder-style layout */}
-        <View style={styles.initialView}>
-          {/* Large hero image */}
-          <View style={styles.heroImageContainer}>
-            {developer.avatarUrl ? (
-              <Image source={{ uri: developer.avatarUrl }} style={styles.heroImage} />
-            ) : (
-              <View style={styles.placeholderHeroImage}>
-                <Ionicons name="person" size={isSmallScreen ? 80 : 100} color="#999" />
-              </View>
-            )}
-            
-            {/* Gradient overlay for text readability */}
-            <View style={styles.imageOverlay} />
-            
-            {/* Text overlay on image */}
-            <View style={styles.imageTextOverlay}>
-              <Text style={[styles.heroName, isSmallScreen && styles.heroNameSmall]}>{developer.name}</Text>
-              <Text style={[styles.heroAge, isSmallScreen && styles.heroAgeSmall]}>
-                {developer.experience} years experience
-              </Text>
-            </View>
-          </View>
-          
-          {/* Compact info section */}
-          <View style={styles.compactInfo}>
-            <Text style={[styles.role, isSmallScreen && styles.roleSmall]}>{developer.role}</Text>
-            
-            <View style={styles.infoDetails}>
-              <View style={styles.locationContainer}>
-                <Ionicons name="location-outline" size={16} color="#666" />
-                <Text style={styles.locationText}>{developer.location}</Text>
-              </View>
-              
-              {developer.company && (
-                <View style={styles.companyContainer}>
-                  <Ionicons name="business-outline" size={16} color="#666" />
-                  <Text style={styles.companyText}>{developer.company}</Text>
-                </View>
-              )}
-              
-              {developer.education && (
-                <View style={styles.educationContainer}>
-                  <Ionicons name="school-outline" size={16} color="#666" />
-                  <Text style={styles.educationText}>{developer.education}</Text>
-                </View>
-              )}
-            </View>
-            
-            <View style={styles.topSkillsContainer}>
-              <View style={styles.topSkillsList}>
-                {developer.skills.slice(0, 3).map((skill, index) => (
-                  <View key={index} style={styles.topSkillBadge}>
-                    <Text style={styles.topSkillText}>{skill.name}</Text>
-                  </View>
-                ))}
-                {developer.skills.length > 3 && (
-                  <View style={styles.moreSkillsBadge}>
-                    <Text style={styles.moreSkillsText}>+{developer.skills.length - 3}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </View>
+        {/* Decorative elements */}
+        <View style={styles.decorativeElements}>
+          <View style={[styles.decorativeCircle, styles.decorativeCircle1]} />
+          <View style={[styles.decorativeCircle, styles.decorativeCircle2]} />
+          <View style={[styles.decorativeCircle, styles.decorativeCircle3]} />
         </View>
 
-        {/* Scroll indicator */}
-        <Animated.View 
-          style={[
-            styles.scrollIndicator, 
-            { opacity: scrollIndicatorOpacity }
-          ]}
-        >
-          <Ionicons name="chevron-down" size={20} color="#007AFF" />
-          <Text style={styles.scrollText}>Scroll to view more</Text>
-        </Animated.View>
-
-        {/* Detailed content */}
-        <View style={styles.detailsSection}>
-          {developer.bio && (
-            <View style={styles.detailBlock}>
-              <Text style={[styles.sectionTitle, isSmallScreen && styles.sectionTitleSmall]}>About</Text>
-              <Text style={[styles.bioText, isSmallScreen && styles.bioTextSmall]}>{developer.bio}</Text>
+        {/* Profile Picture */}
+        <View style={styles.profileImageContainer}>
+          {developer.avatarUrl ? (
+            <Image source={{ uri: developer.avatarUrl }} style={styles.profileImage} />
+          ) : (
+            <View style={styles.placeholderProfileImage}>
+              <Ionicons name="person" size={60} color="#fff" />
             </View>
           )}
-          
-          <View style={styles.detailBlock}>
-            <Text style={[styles.sectionTitle, isSmallScreen && styles.sectionTitleSmall]}>All Skills</Text>
-            <View style={styles.allSkillsContainer}>
-              {developer.skills.map((skill, index) => (
-                <SkillBadge key={index} skill={skill} />
+          <View style={styles.profileImageBorder} />
+        </View>
+
+        {/* Name and Role */}
+        <Text style={styles.profileName}>{developer.name}</Text>
+        <Text style={styles.profileRole}>{developer.role}</Text>
+      </LinearGradient>
+
+      {/* Bottom Half - Scrollable Information */}
+      <View style={styles.infoSection}>
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          onScroll={({ nativeEvent }) => setScrollY(nativeEvent.contentOffset.y)}
+          onContentSizeChange={(w, h) => setContentHeight(h)}
+          onLayout={({ nativeEvent }) => setScrollViewHeight(nativeEvent.layout.height)}
+        >
+          {/* Quick Info Cards */}
+          <View style={styles.quickInfoContainer}>
+            {developer.location && (
+              <View style={styles.quickInfoCard}>
+                <Ionicons name="location" size={16} color="#007AFF" />
+                <Text style={styles.quickInfoText}>{developer.location}</Text>
+              </View>
+            )}
+            {developer.company && (
+              <View style={styles.quickInfoCard}>
+                <Ionicons name="business" size={16} color="#34C759" />
+                <Text style={styles.quickInfoText}>{developer.company}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Top Skills */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Top Skills</Text>
+            <View style={styles.topSkillsContainer}>
+              {developer.skills.slice(0, 3).map((skill, index) => (
+                <SkillBadge key={index} skill={skill} isTopSkill={true} />
               ))}
             </View>
           </View>
-          
+
+          {/* About Section */}
+          {developer.bio && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>About</Text>
+              <Text style={styles.bioText}>{developer.bio}</Text>
+            </View>
+          )}
+
+          {/* All Skills */}
+          {developer.skills.length > 3 && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>All Skills ({developer.skills.length})</Text>
+              <View style={styles.allSkillsContainer}>
+                {developer.skills.map((skill, index) => (
+                  <SkillBadge key={index} skill={skill} />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Education */}
+          {developer.education && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Education</Text>
+              <View style={styles.educationCard}>
+                <Ionicons name="school" size={18} color="#666" />
+                <Text style={styles.educationText}>{developer.education}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Social Links */}
           {(developer.github || developer.linkedin || developer.website) && (
-            <View style={styles.detailBlock}>
-              <Text style={[styles.sectionTitle, isSmallScreen && styles.sectionTitleSmall]}>Connect</Text>
-              <View style={styles.socialLinks}>
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Connect</Text>
+              <View style={styles.socialLinksContainer}>
                 {developer.github && (
                   <View style={styles.socialLink}>
-                    <Ionicons name="logo-github" size={16} color="#333" />
+                    <Ionicons name="logo-github" size={20} color="#333" />
                     <Text style={styles.socialLinkText}>GitHub</Text>
                   </View>
                 )}
                 {developer.linkedin && (
                   <View style={styles.socialLink}>
-                    <Ionicons name="logo-linkedin" size={16} color="#0077B5" />
+                    <Ionicons name="logo-linkedin" size={20} color="#0077B5" />
                     <Text style={styles.socialLinkText}>LinkedIn</Text>
                   </View>
                 )}
                 {developer.website && (
                   <View style={styles.socialLink}>
-                    <Ionicons name="globe-outline" size={16} color="#333" />
+                    <Ionicons name="globe" size={20} color="#007AFF" />
                     <Text style={styles.socialLinkText}>Website</Text>
                   </View>
                 )}
               </View>
             </View>
           )}
+
+          {/* Bottom padding */}
+          <View style={{ height: 20 }} />
+        </ScrollView>
+
+        {/* Dynamic blur gradient overlay */}
+        <View style={[styles.blurContainer, { opacity: getBlurOpacity() }]}>
+          <LinearGradient
+            colors={[
+              'rgba(248, 249, 250, 0)', 
+              'rgba(248, 249, 250, 0.3)', 
+              'rgba(248, 249, 250, 0.8)', 
+              'rgba(248, 249, 250, 1)'
+            ]}
+            style={styles.blurGradient}
+            pointerEvents="none"
+          />
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 
   const renderCard = () => (
     <View style={styles.container}>
       <Animated.View style={[styles.cardWrapper, cardAnimatedStyle]}>
-        {renderScrollableCard()}
+        {renderTradingCard()}
       </Animated.View>
       
-      {/* Swipe indicators - positioned better for mobile */}
+      {/* Swipe indicators */}
       <View style={styles.swipeIndicators}>
         <View style={styles.swipeHint}>
-          <Ionicons name="arrow-back" size={isSmallScreen ? 20 : 24} color="#ff4d4d" />
-          <Text style={[styles.swipeHintText, isSmallScreen && styles.swipeHintTextSmall]}>Not Interested</Text>
+          <Ionicons name="close" size={24} color="#ff4d4d" />
+          <Text style={styles.swipeHintText}>Pass</Text>
         </View>
         <View style={styles.swipeHint}>
-          <Text style={[styles.swipeHintText, isSmallScreen && styles.swipeHintTextSmall]}>Interested</Text>
-          <Ionicons name="arrow-forward" size={isSmallScreen ? 20 : 24} color="#4dd964" />
+          <Text style={styles.swipeHintText}>Connect</Text>
+          <Ionicons name="heart" size={24} color="#4dd964" />
         </View>
       </View>
     </View>
@@ -400,7 +427,7 @@ export default function FlippableSwipeCard({
 const styles = StyleSheet.create({
   container: {
     width: CARD_WIDTH,
-    height: CARD_HEIGHT + 60, // Reduced from 120 to eliminate whitespace
+    height: CARD_HEIGHT + 60,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
@@ -412,270 +439,254 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: 20,
     backgroundColor: 'white',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.08)',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  initialView: {
-    height: CARD_HEIGHT - 40, // Leave space for scroll indicator
-    padding: 0, // Remove padding to let image extend to edges
-    flexDirection: 'column',
-  },
-  heroImageContainer: {
+  
+  // Profile Section (Top Half)
+  profileSection: {
+    height: '38%', // Reduced from 42% to make top half smaller
     position: 'relative',
-    width: '100%',
-    height: '55%', // Reduced from 70% to give more space to skills
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    overflow: 'hidden',
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  placeholderHeroImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
-  imageOverlay: {
+  decorativeElements: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
-  imageTextOverlay: {
+  decorativeCircle: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    alignItems: 'flex-start',
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  heroName: {
-    fontSize: screenHeight < 700 ? 28 : 32,
+  decorativeCircle1: {
+    width: 100,
+    height: 100,
+    top: -30,
+    right: -20,
+  },
+  decorativeCircle2: {
+    width: 60,
+    height: 60,
+    bottom: 20,
+    left: -10,
+  },
+  decorativeCircle3: {
+    width: 40,
+    height: 40,
+    top: 30,
+    left: 20,
+  },
+  profileImageContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  placeholderProfileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  profileImageBorder: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    right: -8,
+    bottom: -8,
+    borderRadius: 58,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  profileName: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
-    textAlign: 'left',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.7)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  heroNameSmall: {
-    fontSize: 26,
-  },
-  heroAge: {
-    fontSize: screenHeight < 700 ? 16 : 18,
-    color: 'white',
-    textAlign: 'left',
-    textShadowColor: 'rgba(0, 0, 0, 0.7)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  heroAgeSmall: {
-    fontSize: 14,
-  },
-  compactInfo: {
-    flex: 1,
-    padding: screenHeight < 700 ? 16 : 20,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  role: {
-    fontSize: screenHeight < 700 ? 18 : 20,
-    color: '#333',
-    fontWeight: '600',
     textAlign: 'center',
-    marginBottom: screenHeight < 700 ? 8 : 10,
+    marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
-  roleSmall: {
+  profileRole: {
     fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
-  infoDetails: {
-    alignItems: 'center',
-    marginBottom: screenHeight < 700 ? 12 : 16,
+
+  // Info Section (Bottom Half)
+  infoSection: {
+    height: '62%', // Adjusted to match profile section changes
+    backgroundColor: '#f8f9fa', // Light gray instead of white
+    position: 'relative',
   },
-  locationContainer: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  quickInfoContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 8,
+  },
+  quickInfoCard: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
-  },
-  locationText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
-  },
-  companyContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  companyText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
-  },
-  educationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  educationText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
-  },
-  topSkillsContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginTop: 'auto',
-  },
-  topSkillsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  topSkillBadge: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#f8f9fa',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginHorizontal: 3,
-    marginVertical: 3,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
-  topSkillText: {
-    color: 'white',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  moreSkillsBadge: {
-    backgroundColor: '#E5E5EA',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginHorizontal: 3,
-    marginVertical: 3,
-  },
-  moreSkillsText: {
-    color: '#666',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  scrollIndicator: {
-    alignItems: 'center',
-    paddingVertical: 15,
-    marginTop: -20,
-  },
-  scrollText: {
+  quickInfoText: {
     fontSize: 12,
-    color: '#007AFF',
-    marginTop: 4,
+    color: '#333',
     fontWeight: '500',
+    marginLeft: 6,
+    flex: 1,
   },
-  detailsSection: {
-    padding: screenHeight < 700 ? 16 : 20,
-    paddingTop: 0,
-  },
-  detailBlock: {
-    marginBottom: screenHeight < 700 ? 20 : 24,
+  sectionContainer: {
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: screenHeight < 700 ? 16 : 18,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  sectionTitleSmall: {
-    fontSize: 14,
-  },
-  bioText: {
-    fontSize: screenHeight < 700 ? 14 : 16,
-    lineHeight: screenHeight < 700 ? 20 : 22,
-    color: '#666',
-  },
-  bioTextSmall: {
-    fontSize: 12,
-    lineHeight: 18,
+  
+  // Skills
+  topSkillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   allSkillsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 6,
   },
   skillBadge: {
-    backgroundColor: '#f0f0f0',
-    padding: screenHeight < 700 ? 8 : 10,
-    borderRadius: 10,
-    marginRight: 6,
-    marginBottom: 6,
+    backgroundColor: '#f0f2f5',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  topSkillBadge: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
   },
   skillText: {
-    fontSize: screenHeight < 700 ? 12 : 14,
-    fontWeight: 'bold',
+    fontSize: 12,
     color: '#333',
+    fontWeight: '500',
   },
-  skillLevel: {
-    fontSize: screenHeight < 700 ? 10 : 12,
+  topSkillText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+
+  // Bio
+  bioText: {
+    fontSize: 14,
+    lineHeight: 20,
     color: '#666',
-    marginTop: 2,
   },
-  socialLinks: {
+
+  // Education
+  educationCard: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 10,
+  },
+  educationText: {
+    fontSize: 14,
+    color: '#333',
+    marginLeft: 8,
+    flex: 1,
+  },
+
+  // Social Links
+  socialLinksContainer: {
+    flexDirection: 'row',
+    gap: 12,
   },
   socialLink: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f8f9fa',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 8,
-    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    flex: 1,
   },
   socialLinkText: {
-    fontSize: screenHeight < 700 ? 12 : 14,
+    fontSize: 12,
     color: '#333',
-    marginLeft: 4,
+    fontWeight: '500',
+    marginLeft: 6,
   },
+
+  // Swipe Indicators
   swipeIndicators: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingHorizontal: 40,
+    marginTop: 16,
     width: '100%',
-    position: 'absolute',
-    bottom: -20,
   },
   swipeHint: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
   swipeHintText: {
-    fontSize: screenHeight < 700 ? 12 : 14,
-    color: '#999',
-    marginHorizontal: 6,
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
   },
-  swipeHintTextSmall: {
-    fontSize: 11,
+
+  // Dynamic Blur
+  blurContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    backgroundColor: 'transparent',
+  },
+  blurGradient: {
+    flex: 1,
   },
 }); 

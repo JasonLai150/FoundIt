@@ -2,53 +2,39 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useAuth } from './contexts/SupabaseAuthContext';
 import { showAlert } from './utils/alert';
 
 export default function AuthScreen() {
-  const { login, register, isAuthenticated, navigationTrigger } = useAuth();
+  const { login, register, isAuthenticated } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [stayLoggedIn, setStayLoggedIn] = useState(true);
-  const [hasNavigated, setHasNavigated] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
     email: '',
     password: '',
   });
 
-  // Listen for authentication success and navigate
+  // Redirect to index.tsx when authenticated - let index.tsx handle the routing logic
   useEffect(() => {
-    if (isAuthenticated && !hasNavigated) {
-      console.log('🔄 Auth screen detected authentication, navigating to feed...');
-      setHasNavigated(true);
-      try {
-        router.replace('/(tabs)/feed');
-        console.log('✅ Navigation from auth screen initiated');
-      } catch (error) {
-        console.error('❌ Navigation from auth screen failed:', error);
-        setHasNavigated(false); // Reset if navigation failed
-      }
+    if (isAuthenticated) {
+      console.log('🔄 Auth screen detected authentication, redirecting to index for proper routing...');
+      router.replace('/');
     }
-  }, [isAuthenticated, navigationTrigger, router, hasNavigated]);
+  }, [isAuthenticated, router]);
 
   const handleAuthentication = async () => {
     if (!formData.email || !formData.password) {
       showAlert('Error', 'Please fill in all required fields');
-      return;
-    }
-
-    if (isSignUp && !formData.name) {
-      showAlert('Error', 'Please enter your name');
       return;
     }
 
@@ -65,7 +51,7 @@ export default function AuthScreen() {
       
       if (isSignUp) {
         console.log('🔄 Attempting registration...');
-        success = await register(formData.name, formData.email, formData.password, stayLoggedIn);
+        success = await register(formData.email, formData.password, stayLoggedIn);
         console.log('📊 Registration result:', success);
       } else {
         console.log('🔄 Attempting login...');
@@ -86,23 +72,11 @@ export default function AuthScreen() {
 
   const toggleAuthMode = () => {
     setIsSignUp(!isSignUp);
-    setFormData({ name: '', email: '', password: '' });
+    setFormData({ email: '', password: '' });
   };
 
   const toggleStayLoggedIn = () => {
     setStayLoggedIn(!stayLoggedIn);
-  };
-
-  const testAlert = () => {
-    showAlert(
-      '🧪 Alert Test',
-      'This is a test alert to verify the Alert system is working properly.\n\nIf you see this, alerts are functional!',
-      [{ text: 'OK', style: 'default' }]
-    );
-  };
-
-  const goToSupabaseTest = () => {
-    router.push('/test-supabase' as any);
   };
 
   return (
@@ -112,16 +86,6 @@ export default function AuthScreen() {
         <Text style={styles.subtitle}>Connect with talented developers</Text>
 
         <View style={styles.form}>
-          {isSignUp && (
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              value={formData.name}
-              onChangeText={(text) => setFormData({ ...formData, name: text })}
-              autoCapitalize="words"
-            />
-          )}
-          
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -175,20 +139,6 @@ export default function AuthScreen() {
                 : "Don't have an account? Sign Up"
               }
             </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={goToSupabaseTest}
-          >
-            <Text style={styles.debugText}>🔧 Test Supabase Connection</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={testAlert}
-          >
-            <Text style={styles.debugText}>🧪 Test Alert System</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -277,14 +227,5 @@ const styles = StyleSheet.create({
   switchText: {
     color: '#FF5864',
     fontSize: 14,
-  },
-  debugButton: {
-    marginTop: 20,
-    alignItems: 'center',
-    padding: 10,
-  },
-  debugText: {
-    color: '#999',
-    fontSize: 12,
   },
 }); 
