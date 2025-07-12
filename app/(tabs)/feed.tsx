@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 24,
     paddingTop: screenHeight < 700 ? 4 : 8,
-    paddingBottom: screenHeight < 700 ? 8 : 12,
+    paddingBottom: screenHeight < 700 ? 16 : 20,
     backgroundColor: '#fff',
   },
   headerTitle: {
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: screenHeight < 700 ? 16 : 24,
     paddingBottom: screenHeight < 700 ? 60 : 70,
   },
   errorText: {
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
-    marginBottom: 8,
+    marginBottom: screenHeight < 700 ? 12 : 16,
   },
   searchContainer: {
     flexDirection: 'row',
