@@ -29,9 +29,20 @@ class MatchService {
    */
   async recordUserAction(userId: string, targetUserId: string, actionType: 'like' | 'pass'): Promise<boolean> {
     try {
-      console.log(`📱 Recording ${actionType}:`, { userId, targetUserId });
-      
-      // Insert user action (will automatically create match if mutual like via trigger)
+      // Check if user has already swiped on this profile
+      const { data: existingAction } = await supabase
+        .from('user_actions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('target_user_id', targetUserId)
+        .single();
+
+      if (existingAction) {
+        console.error('User has already swiped on this profile');
+        return false;
+      }
+
+      // Record the action
       const { data, error } = await supabase
         .from('user_actions')
         .insert({
@@ -40,29 +51,53 @@ class MatchService {
           action_type: actionType,
           created_at: new Date().toISOString()
         })
-        .select();
+        .select()
+        .single();
 
       if (error) {
-        // Check if it's a duplicate constraint error
-        if (error.code === '23505') {
-          console.log('⚠️ User has already swiped on this profile');
-          return true; // Not really an error, just already swiped
-        }
-        console.error('❌ Error recording user action:', error);
+        console.error('Error recording user action:', error);
         return false;
       }
 
-      console.log('✅ User action recorded successfully:', data);
-
-      // If it was a like, check if a match was created
+      // If it's a like, check for mutual match
       if (actionType === 'like') {
-        await this.checkForNewMatch(userId, targetUserId);
+        await this.checkForMutualMatch(userId, targetUserId);
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Error in recordUserAction:', error);
+      console.error('Error in recordUserAction:', error);
       return false;
+    }
+  }
+
+  private async checkForMutualMatch(userId: string, targetUserId: string): Promise<void> {
+    try {
+      // Check if the target user has also liked this user
+      const { data: mutualLike } = await supabase
+        .from('user_actions')
+        .select('id')
+        .eq('user_id', targetUserId)
+        .eq('target_user_id', userId)
+        .eq('action_type', 'like')
+        .single();
+
+      if (mutualLike) {
+        // Create a match
+        const { error } = await supabase
+          .from('matches')
+          .insert({
+            user_id_1: userId,
+            user_id_2: targetUserId,
+            created_at: new Date().toISOString()
+          });
+
+        if (error) {
+          console.error('Error creating match:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for mutual match:', error);
     }
   }
 
@@ -89,10 +124,10 @@ class MatchService {
       const isMatched = await this.areUsersMatched(userId, targetUserId);
       
       if (isMatched) {
-        console.log('🎉 New mutual match created between users:', userId, 'and', targetUserId);
+        // Match was created - could trigger notifications here
       }
     } catch (error) {
-      console.error('❌ Error in checkForNewMatch:', error);
+      console.error('Error in checkForNewMatch:', error);
     }
   }
 
@@ -286,28 +321,24 @@ class MatchService {
   }
 
   /**
-   * Unmatch users (deactivate match)
+   * Unmatch two users (remove match and set inactive)
    */
   async unmatchUsers(userId1: string, userId2: string): Promise<boolean> {
     try {
-      // Use a simpler approach - sort user IDs to match database constraint
-      const [smallerId, largerId] = [userId1, userId2].sort();
-      
+      // Update the match to inactive
       const { error } = await supabase
         .from('matches')
         .update({ is_active: false })
-        .eq('user_id_1', smallerId)
-        .eq('user_id_2', largerId);
+        .or(`and(user_id_1.eq.${userId1},user_id_2.eq.${userId2}),and(user_id_1.eq.${userId2},user_id_2.eq.${userId1})`);
 
       if (error) {
-        console.error('❌ Error unmatching users:', error);
+        console.error('Error unmatching users:', error);
         return false;
       }
 
-      console.log('✅ Users unmatched successfully');
       return true;
     } catch (error) {
-      console.error('❌ Error in unmatchUsers:', error);
+      console.error('Error in unmatchUsers:', error);
       return false;
     }
   }

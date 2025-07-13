@@ -196,39 +196,29 @@ class MatchmakingService {
   /**
    * Filter out profiles that the user has already swiped on
    */
-  private async filterOutAlreadySwipedProfiles(currentUserId: string, profiles: any[]): Promise<any[]> {
+  private async filterOutAlreadySwipedProfiles(userId: string, profiles: any[]): Promise<any[]> {
     try {
-      if (profiles.length === 0) return profiles;
-
-      // Get all user actions for this user
-      const { data: userActions, error } = await supabase
+      const { data: swipedProfiles, error } = await supabase
         .from('user_actions')
         .select('target_user_id')
-        .eq('user_id', currentUserId);
+        .eq('user_id', userId);
 
       if (error) {
-        console.error('❌ Error fetching user actions for filtering:', error);
-        return profiles; // Return unfiltered profiles if we can't check
-      }
-
-      // If user has no actions yet, return all profiles
-      if (!userActions || userActions.length === 0) {
-        console.log('✅ No previous swipes found, showing all profiles');
+        console.error('Error fetching user actions:', error);
         return profiles;
       }
 
-      // Create a set of already-swiped user IDs for fast lookup
-      const alreadySwipedIds = new Set(userActions.map(action => action.target_user_id));
+      if (!swipedProfiles || swipedProfiles.length === 0) {
+        return profiles;
+      }
 
-      // Filter out profiles that have already been swiped on
-      const filteredProfiles = profiles.filter(profile => !alreadySwipedIds.has(profile.id));
+      const swipedUserIds = swipedProfiles.map(action => action.target_user_id);
+      const filteredProfiles = profiles.filter(profile => !swipedUserIds.includes(profile.id));
 
-      console.log(`🔍 Filtered out ${profiles.length - filteredProfiles.length} already-swiped profiles (${filteredProfiles.length} remaining)`);
-      
       return filteredProfiles;
     } catch (error) {
-      console.error('❌ Error in filterOutAlreadySwipedProfiles:', error);
-      return profiles; // Return unfiltered profiles if filtering fails
+      console.error('Error filtering swiped profiles:', error);
+      return profiles;
     }
   }
 

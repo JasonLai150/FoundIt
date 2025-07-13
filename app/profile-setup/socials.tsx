@@ -1,28 +1,152 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useAuth } from '../contexts/SupabaseAuthContext';
 import { showAlert } from '../utils/alert';
+import { deleteAvatar, pickAndUploadAvatar } from '../utils/avatarUpload';
+
+interface SocialsFormData {
+  github: string;
+  linkedin: string;
+  website: string;
+  avatarUrl: string;
+  bio: string;
+}
+
+const SOCIALS_CACHE_KEY = 'socials_setup_cache';
 
 export default function SocialsSetup() {
   const { updateUserProfile, user } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '');
+  const [cacheBuster, setCacheBuster] = useState(''); // For forcing image refresh after upload
   const [formData, setFormData] = useState({
     github: user?.github || '',
     linkedin: user?.linkedin || '',
     website: user?.website || '',
+    bio: user?.bio || '',
   });
+
+  // Load cached data on component mount
+  useEffect(() => {
+    loadCachedData();
+  }, []);
+
+  // Save to cache whenever form data changes
+  useEffect(() => {
+    saveToCacheDebounced();
+  }, [formData, avatarUrl]);
+
+  const loadCachedData = async () => {
+    try {
+      const cachedData = await AsyncStorage.getItem(SOCIALS_CACHE_KEY);
+      if (cachedData) {
+        const parsedData: SocialsFormData = JSON.parse(cachedData);
+        // Only load cache if there's no existing user data
+        if (!user?.github) {
+          setFormData({
+            github: parsedData.github || '',
+            linkedin: parsedData.linkedin || '',
+            website: parsedData.website || '',
+            bio: parsedData.bio || '',
+          });
+        }
+        // Always load avatar URL if it exists in cache
+        if (parsedData.avatarUrl && !avatarUrl) {
+          setAvatarUrl(parsedData.avatarUrl);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load cached socials data:', error);
+    }
+  };
+
+  const saveToCache = async () => {
+    try {
+      const dataToCache: SocialsFormData = {
+        github: formData.github,
+        linkedin: formData.linkedin,
+        website: formData.website,
+        avatarUrl: avatarUrl,
+        bio: formData.bio,
+      };
+      await AsyncStorage.setItem(SOCIALS_CACHE_KEY, JSON.stringify(dataToCache));
+    } catch (error) {
+      console.error('Failed to save socials data to cache:', error);
+    }
+  };
+
+  // Debounced save to avoid too many cache writes
+  const saveToCacheDebounced = (() => {
+    let timeout: number;
+    return () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(saveToCache, 500);
+    };
+  })();
+
+  const clearCache = async () => {
+    try {
+      await AsyncStorage.removeItem(SOCIALS_CACHE_KEY);
+    } catch (error) {
+      console.error('Failed to clear socials cache:', error);
+    }
+  };
+
+  const handleAvatarUpload = async () => {
+    if (!user?.id) return;
+    
+    setIsUploadingAvatar(true);
+    try {
+      const result = await pickAndUploadAvatar(user.id);
+      
+      if (result.success && result.url) {
+        setAvatarUrl(result.url);
+        setCacheBuster(`?t=${Date.now()}`);
+      } else {
+        showAlert('Upload Failed', result.error || 'Failed to upload avatar');
+      }
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      showAlert('Upload Failed', 'An error occurred while uploading your avatar');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!avatarUrl) return;
+    
+    setIsUploadingAvatar(true);
+    try {
+      const deleted = await deleteAvatar(avatarUrl);
+      if (deleted) {
+        setAvatarUrl('');
+        setCacheBuster('');
+      } else {
+        showAlert('Remove Failed', 'Failed to remove avatar');
+      }
+    } catch (error) {
+      console.error('Avatar removal error:', error);
+      showAlert('Remove Failed', 'An error occurred while removing your avatar');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const validateURL = (url: string, platform: string): boolean => {
     if (!url.trim()) return true; // Optional field
@@ -76,11 +200,14 @@ export default function SocialsSetup() {
         github: formData.github.trim() || undefined,
         linkedin: formData.linkedin.trim() || undefined,
         website: formData.website.trim() || undefined,
+        bio: formData.bio.trim() || undefined,
+        avatar_url: avatarUrl || undefined,
         profile_complete: true, // Mark profile as complete
       });
 
       if (success) {
-        // Navigate directly like other steps, then show success message
+        // Clear cache only after successful submission
+        await clearCache();
         router.replace('/(tabs)/feed');
         
         // Show success message after navigation
@@ -94,6 +221,7 @@ export default function SocialsSetup() {
       }
     } catch (error) {
       console.error('Error completing profile:', error);
+      showAlert('Error', 'Failed to complete profile setup');
     } finally {
       setIsLoading(false);
     }
@@ -103,12 +231,18 @@ export default function SocialsSetup() {
     setIsLoading(true);
     try {
       // Mark profile as complete even if socials are skipped
-      const success = await updateUserProfile({ profile_complete: true });
+      const success = await updateUserProfile({ 
+        profile_complete: true,
+        avatar_url: avatarUrl || undefined,
+      });
       if (success) {
+        // Clear cache when skipping
+        await clearCache();
         router.replace('/(tabs)/feed');
       }
     } catch (error) {
       console.error('Error skipping to complete:', error);
+      showAlert('Error', 'Failed to complete profile setup');
     } finally {
       setIsLoading(false);
     }
@@ -132,8 +266,8 @@ export default function SocialsSetup() {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.title}>Social Links</Text>
-          <Text style={styles.subtitle}>Connect your online presence</Text>
+          <Text style={styles.title}>Profile Photo & Social Links</Text>
+          <Text style={styles.subtitle}>Add your photo and connect your online presence</Text>
           <View style={styles.progressContainer}>
             <View style={[styles.progressDot, styles.progressCompleted]} />
             <View style={[styles.progressDot, styles.progressCompleted]} />
@@ -144,9 +278,86 @@ export default function SocialsSetup() {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.form}>
+          {/* Avatar Upload Section */}
+          <View style={styles.avatarSection}>
+            <Text style={styles.sectionTitle}>Profile Photo</Text>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatarImageContainer}>
+                {avatarUrl ? (
+                  <Image 
+                    source={{ 
+                      uri: `${avatarUrl}${cacheBuster}`, // Use cache buster only when needed
+                    }} 
+                    style={styles.avatarImage}
+                    cachePolicy="memory-disk" // Enable caching for better performance
+                    onError={(error) => {
+                      console.error('Avatar image load error:', error.error);
+                    }}
+                  />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Ionicons name="person" size={60} color="#ccc" />
+                  </View>
+                )}
+              </View>
+              <View style={styles.avatarButtons}>
+                <TouchableOpacity
+                  style={[styles.avatarButton, isUploadingAvatar && styles.avatarButtonDisabled]}
+                  onPress={handleAvatarUpload}
+                  disabled={isUploadingAvatar}
+                >
+                  {isUploadingAvatar ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="camera" size={20} color="#fff" />
+                      <Text style={styles.avatarButtonText}>
+                        {avatarUrl ? 'Change Photo' : 'Upload Photo'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                {avatarUrl && (
+                  <TouchableOpacity
+                    style={[styles.avatarButton, styles.removeButton, isUploadingAvatar && styles.avatarButtonDisabled]}
+                    onPress={handleRemoveAvatar}
+                    disabled={isUploadingAvatar}
+                  >
+                    <Ionicons name="trash" size={20} color="#FF5864" />
+                    <Text style={[styles.avatarButtonText, styles.removeButtonText]}>Remove</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+            <Text style={styles.avatarHint}>
+              Upload a clear photo of yourself to help others recognize you. Square photos work best.
+            </Text>
+          </View>
+
           <Text style={styles.description}>
             Adding your social links helps others connect with you and learn more about your work. All fields are optional.
           </Text>
+
+          {/* Bio Section */}
+          <View style={styles.inputGroup}>
+            <View style={styles.labelContainer}>
+              <Ionicons name="person-outline" size={20} color="#333" style={styles.labelIcon} />
+              <Text style={styles.label}>About Me</Text>
+            </View>
+            <TextInput
+              style={[styles.input, styles.bioInput]}
+              value={formData.bio}
+              onChangeText={(text) => setFormData({ ...formData, bio: text })}
+              placeholder="Tell others about yourself, your interests, and what you're passionate about..."
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              maxLength={500}
+            />
+            <Text style={styles.hint}>
+              Share a brief introduction about yourself ({formData.bio.length}/500 characters)
+            </Text>
+          </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.labelContainer}>
@@ -213,9 +424,9 @@ export default function SocialsSetup() {
 
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.skipButton, isLoading && styles.buttonDisabled]}
+          style={[styles.skipButton, (isLoading || isUploadingAvatar) && styles.buttonDisabled]}
           onPress={handleSkip}
-          disabled={isLoading}
+          disabled={isLoading || isUploadingAvatar}
         >
           {isLoading ? (
             <ActivityIndicator color="#666" />
@@ -225,9 +436,9 @@ export default function SocialsSetup() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.completeButton, isLoading && styles.buttonDisabled]}
+          style={[styles.completeButton, (isLoading || isUploadingAvatar) && styles.buttonDisabled]}
           onPress={handleComplete}
-          disabled={isLoading}
+          disabled={isLoading || isUploadingAvatar}
         >
           {isLoading ? (
             <ActivityIndicator color="#fff" />
@@ -294,6 +505,75 @@ const styles = StyleSheet.create({
   form: {
     paddingHorizontal: 24,
   },
+  avatarSection: {
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  avatarContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  avatarImageContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 16,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: '#e0e0e0',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#f9f9f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  avatarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF5864',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  avatarButtonDisabled: {
+    opacity: 0.6,
+  },
+  avatarButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  removeButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#FF5864',
+  },
+  removeButtonText: {
+    color: '#FF5864',
+  },
+  avatarHint: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: 8,
+  },
   description: {
     fontSize: 16,
     color: '#666',
@@ -325,6 +605,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     backgroundColor: '#f9f9f9',
     marginBottom: 8,
+  },
+  bioInput: {
+    height: 100,
+    textAlignVertical: 'top',
+    paddingTop: 16,
   },
   hint: {
     fontSize: 14,

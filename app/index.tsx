@@ -1,83 +1,49 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, StyleSheet, Text } from 'react-native';
 import { useAuth } from './contexts/SupabaseAuthContext';
 
 export default function Index() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
   const router = useRouter();
   const [hasNavigated, setHasNavigated] = useState(false);
 
   useEffect(() => {
-    // Don't navigate if still loading
-    if (isLoading) {
-      console.log('⏳ Still loading auth state...');
-      return;
-    }
-
-    // Don't navigate if already navigated
-    if (hasNavigated) {
-      console.log('✅ Already navigated');
-      return;
-    }
-
-    console.log('🔄 Navigation check:', {
-      isAuthenticated,
-      user: user ? { id: user.id, profile_complete: user.profile_complete } : null
-    });
-
-    // Case 1: Not authenticated -> Go to auth
+    if (isLoading) return;
+    
+    if (hasNavigated) return;
+    
     if (!isAuthenticated) {
-      console.log('🔄 Not authenticated -> Auth page');
       router.replace('/auth');
       setHasNavigated(true);
       return;
     }
-
-    // Case 2: Authenticated but no user data -> Wait (loading state)
-    if (!user) {
-      console.log('⏳ Authenticated but no user data, waiting...');
-      return;
-    }
-
-    // Case 3: Authenticated with user data
-    if (user.profile_complete === true) {
-      console.log('🔄 Profile complete -> Feed');
+    
+    // Wait for user data to load
+    if (!user) return;
+    
+    // Navigate based on profile completion
+    if (user.profile_complete) {
       router.replace('/(tabs)/feed');
     } else {
-      console.log('🔄 Profile incomplete -> Setup');
       router.replace('/profile-setup/personal');
     }
     
     setHasNavigated(true);
-
-  }, [isAuthenticated, isLoading, user, hasNavigated, router]);
+  }, [isAuthenticated, user, isLoading, hasNavigated, router]);
 
   // Reset navigation state when user logs out
   useEffect(() => {
-    if (!isAuthenticated && hasNavigated) {
-      console.log('🔄 User logged out, resetting navigation');
+    if (!isAuthenticated) {
       setHasNavigated(false);
     }
-  }, [isAuthenticated, hasNavigated]);
-
-  // Show appropriate loading message
-  let loadingMessage = 'Loading...';
-  if (!isLoading) {
-    if (!isAuthenticated) {
-      loadingMessage = 'Redirecting to login...';
-    } else if (!user) {
-      loadingMessage = 'Loading profile...';
-    } else {
-      loadingMessage = user.profile_complete ? 'Redirecting to feed...' : 'Redirecting to setup...';
-    }
-  }
+  }, [isAuthenticated]);
 
   return (
-    <View style={styles.loadingContainer}>
+    <SafeAreaView style={styles.container}>
       <ActivityIndicator size="large" color="#FF5864" />
-      <Text style={styles.loadingText}>{loadingMessage}</Text>
-    </View>
+      <Text style={styles.text}>Loading...</Text>
+    </SafeAreaView>
   );
 }
 
@@ -89,6 +55,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  text: {
     marginTop: 16,
     fontSize: 16,
     color: '#666',

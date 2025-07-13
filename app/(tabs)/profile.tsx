@@ -1,101 +1,143 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import ProfileCard from '../components/ProfileCard';
 import { useAuth } from '../contexts/SupabaseAuthContext';
+import { Developer, Skill } from '../models/Developer';
 import { showConfirmAlert } from '../utils/alert';
 
-const { height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 export default function ProfileScreen() {
-  const { user, logout, isAuthenticated, isLoading } = useAuth();
+  const { user, logout, isAuthenticated, isLoading, fetchUserExperience } = useAuth();
   const router = useRouter();
+  const [experienceData, setExperienceData] = useState<any>(null);
+  const [loadingExperience, setLoadingExperience] = useState(true);
 
   // Navigate to auth page if user is not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      console.log('🔄 Profile: User not authenticated, navigating to auth...');
-      // Use setTimeout to ensure navigation happens after component render
       setTimeout(() => {
         router.replace('/auth');
       }, 100);
     }
   }, [isAuthenticated, isLoading, router]);
 
-  const handleLogout = () => {
-    console.log('🚪 Logout button pressed!');
+  // Fetch experience data
+  useEffect(() => {
+    if (user?.id) {
+      loadExperienceData();
+    }
+  }, [user?.id]);
+
+  const loadExperienceData = async () => {
+    if (!user?.id) return;
     
-    // Use cross-platform confirm alert
+    try {
+      setLoadingExperience(true);
+      const experience = await fetchUserExperience(user.id);
+      setExperienceData(experience);
+    } catch (error) {
+      console.error('Error loading experience data:', error);
+    } finally {
+      setLoadingExperience(false);
+    }
+  };
+
+  // Convert user data to Developer format for the profile card
+  const userAsDeveloper: Developer | null = useMemo(() => {
+    if (!user) return null;
+    
+    // Transform skills from experience data
+    const skills: Skill[] = experienceData?.skills ? 
+      experienceData.skills.map((skillName: string, index: number) => ({
+        id: `${user.id}_${index}`,
+        name: skillName,
+        level: 'Intermediate' as const
+      })) : [];
+
+    // Get education info
+    const education = experienceData?.education?.[0];
+    const educationString = education ? 
+      `${education.degree || ''} ${education.major || ''}, ${education.school_name || ''}`.trim() : 
+      undefined;
+
+    // Get work experience info  
+    const workExperience = experienceData?.work_experience?.[0];
+    const company = workExperience?.company;
+    
+    return {
+      id: user.id,
+      name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Your Name',
+      bio: user.bio || 'Add a bio to tell others about yourself...',
+      role: user.role || 'Developer',
+      skills,
+      avatarUrl: user.avatar_url,
+      location: user.location,
+      company,
+      education: educationString,
+      github: user.github,
+      linkedin: user.linkedin,
+      website: user.website,
+      looking: user.goal === 'searching',
+    };
+  }, [user, experienceData]);
+
+  const handleLogout = () => {
     showConfirmAlert(
       'Logout Confirmation',
       'Are you sure you want to logout?',
       () => {
-        console.log('🔄 User confirmed logout');
         performLogout();
       },
       () => {
-        console.log('❌ Logout cancelled');
+        // Logout cancelled
       }
     );
   };
 
   const performLogout = async () => {
     try {
-      console.log('🔄 Starting logout process from profile...');
       await logout();
-      console.log('✅ Logout completed - navigation should be handled by auth context');
-      // No need to manually navigate here - the auth context handles it
     } catch (error) {
-      console.error('❌ Logout failed:', error);
-      // The auth context will handle showing error messages
+      console.error('Logout failed:', error);
     }
   };
 
-  // Add loading state check
+  // Show loading state
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
-        </View>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text>Loading profile...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // If not authenticated, show redirecting message
-  if (!isAuthenticated) {
+  // Show error state if no user
+  if (!isAuthenticated || !user) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Redirecting to login...</Text>
+        <View style={styles.errorContainer}>
+          <Text>Please log in to view your profile</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // If authenticated but no user data loaded yet
-  if (!user) {
+  const renderProfileCard = () => {
+    if (!userAsDeveloper) return null;
+
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity 
-            style={styles.logoutButton} 
-            onPress={handleLogout}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="log-out-outline" size={24} color="#FF5864" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading profile...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.cardContainer}>
+        <Text style={styles.cardTitle}>Your Profile Card</Text>
+        <ProfileCard developer={userAsDeveloper} />
+      </View>
     );
-  }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -113,9 +155,20 @@ export default function ProfileScreen() {
       <ScrollView style={styles.scrollView}>
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={60} color="#ccc" />
-            </View>
+            {user.avatar_url ? (
+              <Image 
+                source={{ uri: user.avatar_url }} 
+                style={styles.avatar}
+                cachePolicy="memory-disk"
+                onError={(error) => {
+                  console.error('Profile avatar load error:', error.error);
+                }}
+              />
+            ) : (
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={60} color="#ccc" />
+              </View>
+            )}
           </View>
           
           <Text style={styles.name}>{user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : 'Your Name'}</Text>
@@ -139,44 +192,16 @@ export default function ProfileScreen() {
               <Text style={styles.locationText}>{user.location}</Text>
             </View>
           )}
-          
-          <View style={styles.infoSection}>
-            <Text style={styles.sectionTitle}>About Me</Text>
-            <Text style={styles.bio}>
-              {user.bio || 'Share information about your skills, experience, and what kind of developers you\'re looking to connect with.'}
-            </Text>
-          </View>
 
-          {user.github || user.linkedin || user.website ? (
-            <View style={styles.infoSection}>
-              <Text style={styles.sectionTitle}>Connect</Text>
-              <View style={styles.socialLinks}>
-                {user.github && (
-                  <TouchableOpacity style={styles.socialLink}>
-                    <Ionicons name="logo-github" size={20} color="#333" />
-                    <Text style={styles.socialText}>GitHub</Text>
-                  </TouchableOpacity>
-                )}
-                {user.linkedin && (
-                  <TouchableOpacity style={styles.socialLink}>
-                    <Ionicons name="logo-linkedin" size={20} color="#0077B5" />
-                    <Text style={styles.socialText}>LinkedIn</Text>
-                  </TouchableOpacity>
-                )}
-                {user.website && (
-                  <TouchableOpacity style={styles.socialLink}>
-                    <Ionicons name="globe-outline" size={20} color="#333" />
-                    <Text style={styles.socialText}>Website</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          ) : null}
-
-          <TouchableOpacity style={styles.editProfileButton}>
+          <TouchableOpacity 
+            style={styles.editProfileButton}
+            onPress={() => router.push('/edit-profile')}
+          >
             <Ionicons name="create-outline" size={20} color="#FF5864" />
             <Text style={styles.editProfileText}>Edit Profile</Text>
           </TouchableOpacity>
+
+          {renderProfileCard()}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -187,6 +212,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -272,61 +307,32 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 5,
   },
-  infoSection: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  bio: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: '#666',
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  socialLinks: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 10,
-  },
-  socialLink: {
-    alignItems: 'center',
-    marginHorizontal: 10,
-  },
-  socialText: {
-    fontSize: 12,
-    color: '#333',
-    marginTop: 5,
-  },
   editProfileButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF5864',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#FF5864',
+    borderRadius: 12,
     marginTop: 20,
+    gap: 8,
   },
   editProfileText: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 10,
+    color: '#FF5864',
+    fontWeight: '600',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  cardContainer: {
+    marginTop: 20,
     alignItems: 'center',
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 15,
   },
 }); 

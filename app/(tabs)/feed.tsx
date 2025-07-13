@@ -1,17 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    Modal,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Dimensions,
+  Modal,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import FlippableSwipeCard from '../components/FlippableSwipeCard';
+import FlippableSwipeCard, { FlippableSwipeCardRef } from '../components/FlippableSwipeCard';
 import { useFeedViewModel } from '../viewmodels/FeedViewModel';
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -28,28 +28,19 @@ export default function FeedScreen() {
     lookingForWork: false,
   });
 
+  const cardRef = useRef<FlippableSwipeCardRef>(null);
+
+  const handlePassPress = () => {
+    cardRef.current?.handlePassPress();
+  };
+
+  const handleConnectPress = () => {
+    cardRef.current?.handleConnectPress();
+  };
+
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    
-    // Implement search by refreshing profiles with search query
-    if (query.trim()) {
-      // Add search to filters and refresh
-      refreshProfiles({ 
-        location: query.trim(), // Search in location for now
-        // TODO: Could extend to search in bio, skills, company, etc.
-      });
-    } else {
-      // Clear search - refresh with current filters only
-      const matchmakingFilters = {
-        location: filters.location || undefined,
-        experienceMin: filters.experienceMin ? parseInt(filters.experienceMin) : undefined,
-        experienceMax: filters.experienceMax ? parseInt(filters.experienceMax) : undefined,
-        lookingForWork: filters.lookingForWork,
-      };
-      refreshProfiles(matchmakingFilters);
-    }
-    
-    console.log('Searching for:', query);
+    // Search implementation could go here
   };
 
   const applyFilters = () => {
@@ -62,9 +53,7 @@ export default function FeedScreen() {
       lookingForWork: filters.lookingForWork,
     };
     
-    // Use the new refresh functionality
     refreshProfiles(matchmakingFilters);
-    console.log('Applying filters:', matchmakingFilters);
   };
 
   const resetFilters = () => {
@@ -124,11 +113,26 @@ export default function FeedScreen() {
             <Text style={styles.emptySubText}>Check back later for more matches</Text>
           </View>
         ) : developer ? (
-          <FlippableSwipeCard 
-            developer={developer} 
-            onSwipeLeft={swipeLeft} 
-            onSwipeRight={swipeRight} 
-          />
+          <View style={styles.cardContainer}>
+            <FlippableSwipeCard 
+              ref={cardRef}
+              developer={developer} 
+              onSwipeLeft={swipeLeft} 
+              onSwipeRight={swipeRight} 
+            />
+            
+            {/* Swipe Buttons */}
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity onPress={handlePassPress} style={[styles.swipeButton, styles.passButton]}>
+                <Ionicons name="close" size={20} color="#ff6b6b" />
+                <Text style={[styles.swipeButtonText, styles.passButtonText]}>Pass</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleConnectPress} style={[styles.swipeButton, styles.connectButton]}>
+                <Ionicons name="heart" size={20} color="#51cf66" />
+                <Text style={[styles.swipeButtonText, styles.connectButtonText]}>Connect</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         ) : null}
       </View>
 
@@ -242,8 +246,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingTop: screenHeight < 700 ? 16 : 24,
-    paddingBottom: screenHeight < 700 ? 60 : 70,
+    paddingTop: 20,
+    paddingBottom: 30,
   },
   errorText: {
     fontSize: 16,
@@ -269,7 +273,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
-    marginBottom: screenHeight < 700 ? 12 : 16,
+    marginBottom: screenHeight < 700 ? 0 : 0, // Reduced from 12/16 to 6/8
   },
   searchContainer: {
     flexDirection: 'row',
@@ -397,5 +401,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  cardContainer: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '80%',
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
+  swipeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 25,
+    minWidth: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  passButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ff6b6b',
+  },
+  connectButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#51cf66',
+  },
+  swipeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  passButtonText: {
+    color: '#ff6b6b',
+  },
+  connectButtonText: {
+    color: '#51cf66',
   },
 }); 

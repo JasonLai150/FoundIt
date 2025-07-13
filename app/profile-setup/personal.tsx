@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -37,11 +37,25 @@ const GOAL_OPTIONS = [
   }
 ];
 
+interface PersonalFormData {
+  first_name: string;
+  last_name: string;
+  birth_day: string;
+  birth_month: string;
+  birth_year: string;
+  city: string;
+  state: string;
+  role: string;
+  goal: 'recruiting' | 'searching' | 'investing' | 'other';
+}
+
+const PERSONAL_CACHE_KEY = 'personal_setup_cache';
+
 export default function PersonalInfoSetup() {
   const { updateUserProfile, user } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PersonalFormData>({
     first_name: user?.first_name || '',
     last_name: user?.last_name || '',
     // Split DOB into separate fields
@@ -51,8 +65,59 @@ export default function PersonalInfoSetup() {
     // Split location into separate fields
     city: user?.location ? user.location.split(',')[0]?.trim() : '',
     state: user?.location ? user.location.split(',')[1]?.trim() : '',
+    role: user?.role || '',
     goal: user?.goal || 'searching' as 'recruiting' | 'searching' | 'investing' | 'other',
   });
+
+  // Load cached data on component mount
+  useEffect(() => {
+    loadCachedData();
+  }, []);
+
+  // Save to cache whenever form data changes
+  useEffect(() => {
+    saveToCacheDebounced();
+  }, [formData]);
+
+  const loadCachedData = async () => {
+    try {
+      const cachedData = await AsyncStorage.getItem(PERSONAL_CACHE_KEY);
+      if (cachedData) {
+        const parsedData: PersonalFormData = JSON.parse(cachedData);
+        // Only load cache if there's no existing user data
+        if (!user?.first_name) {
+          setFormData(parsedData);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load cached personal data:', error);
+    }
+  };
+
+  const saveToCache = async () => {
+    try {
+      await AsyncStorage.setItem(PERSONAL_CACHE_KEY, JSON.stringify(formData));
+    } catch (error) {
+      console.error('Failed to save personal data to cache:', error);
+    }
+  };
+
+  // Debounced save to avoid too many cache writes
+  const saveToCacheDebounced = (() => {
+    let timeout: number;
+    return () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(saveToCache, 500);
+    };
+  })();
+
+  const clearCache = async () => {
+    try {
+      await AsyncStorage.removeItem(PERSONAL_CACHE_KEY);
+    } catch (error) {
+      console.error('Failed to clear personal cache:', error);
+    }
+  };
 
   const validateForm = () => {
     if (!formData.first_name.trim()) {
@@ -122,25 +187,35 @@ export default function PersonalInfoSetup() {
       // Combine location components
       const location = `${formData.city.trim()}, ${formData.state.trim()}`;
 
-      const success = await updateUserProfile({
+      const updateData = {
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
         dob: dob,
         location: location,
+        role: formData.role.trim() || undefined,
         goal: formData.goal,
-      });
+      };
+
+      const success = await updateUserProfile(updateData);
 
       if (success) {
+        // Clear cache only after successful submission
+        await clearCache();
         router.push('/profile-setup/professional' as any);
+      } else {
+        showAlert('Error', 'Failed to update profile. Please try again.');
       }
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error('Profile setup error:', error);
+      showAlert('Error', 'An error occurred while updating your profile. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    // Clear cache when skipping
+    await clearCache();
     router.push('/(tabs)/feed');
   };
 
@@ -238,40 +313,54 @@ export default function PersonalInfoSetup() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>What's your goal? *</Text>
-            {GOAL_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.goalOption,
-                  formData.goal === option.value && styles.goalOptionSelected
-                ]}
-                onPress={() => setFormData({ ...formData, goal: option.value as any })}
-              >
-                <View style={styles.goalContent}>
-                  <Text style={[
-                    styles.goalTitle,
-                    formData.goal === option.value && styles.goalTitleSelected
+            <Text style={styles.label}>Role</Text>
+            <Text style={styles.hint}>Describe your role</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.role}
+              onChangeText={(text) => setFormData({ ...formData, role: text })}
+              placeholder="Backend Engineer / Startup Founder"
+              placeholderTextColor="#666"
+              autoCapitalize="words"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Goal *</Text>
+            <Text style={styles.hint}>What brings you to FoundIt?</Text>
+            <View style={styles.goalContainer}>
+              {GOAL_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.goalOption,
+                    formData.goal === option.value && styles.goalOptionSelected
+                  ]}
+                  onPress={() => setFormData({ ...formData, goal: option.value as PersonalFormData['goal'] })}
+                >
+                  <View style={styles.goalOptionContent}>
+                    <Text style={[
+                      styles.goalOptionTitle,
+                      formData.goal === option.value && styles.goalOptionTitleSelected
+                    ]}>
+                      {option.title}
+                    </Text>
+                    <Text style={[
+                      styles.goalOptionDescription,
+                      formData.goal === option.value && styles.goalOptionDescriptionSelected
+                    ]}>
+                      {option.description}
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.goalOptionRadio,
+                    formData.goal === option.value && styles.goalOptionRadioSelected
                   ]}>
-                    {option.title}
-                  </Text>
-                  <Text style={[
-                    styles.goalDescription,
-                    formData.goal === option.value && styles.goalDescriptionSelected
-                  ]}>
-                    {option.description}
-                  </Text>
-                </View>
-                <View style={[
-                  styles.goalRadio,
-                  formData.goal === option.value && styles.goalRadioSelected
-                ]}>
-                  {formData.goal === option.value && (
-                    <Ionicons name="checkmark" size={16} color="#fff" />
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
+                    {formData.goal === option.value && <View style={styles.goalOptionRadioInner} />}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -282,7 +371,7 @@ export default function PersonalInfoSetup() {
           onPress={handleSkip}
           disabled={isLoading}
         >
-          <Text style={styles.skipText}>Skip Setup</Text>
+          <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -470,5 +559,52 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
+  },
+  hint: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  goalContainer: {
+    // Add styles for the container if needed, e.g., gap
+  },
+  goalOptionContent: {
+    flex: 1,
+  },
+  goalOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  goalOptionTitleSelected: {
+    color: '#FF5864',
+  },
+  goalOptionDescription: {
+    fontSize: 14,
+    color: '#666',
+  },
+  goalOptionDescriptionSelected: {
+    color: '#333',
+  },
+  goalOptionRadio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  goalOptionRadioSelected: {
+    backgroundColor: '#FF5864',
+    borderColor: '#FF5864',
+  },
+  goalOptionRadioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#fff',
   },
 }); 

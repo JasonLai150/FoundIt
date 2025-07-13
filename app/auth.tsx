@@ -2,77 +2,66 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useAuth } from './contexts/SupabaseAuthContext';
 import { showAlert } from './utils/alert';
 
 export default function AuthScreen() {
-  const { login, register, isAuthenticated } = useAuth();
+  const { isAuthenticated, login, register } = useAuth();
   const router = useRouter();
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [stayLoggedIn, setStayLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [stayLoggedIn, setStayLoggedIn] = useState(true);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
 
-  // Redirect to index.tsx when authenticated - let index.tsx handle the routing logic
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('🔄 Auth screen detected authentication, redirecting to index for proper routing...');
       router.replace('/');
     }
   }, [isAuthenticated, router]);
 
-  const handleAuthentication = async () => {
-    if (!formData.email || !formData.password) {
+  const handleSubmit = async () => {
+    if (!email.trim() || !password.trim()) {
       showAlert('Error', 'Please fill in all required fields');
       return;
     }
 
-    // Validate password length
-    if (formData.password.length < 6) {
+    if (password.length < 6) {
       showAlert('Password Too Short', 'Password must be at least 6 characters long');
       return;
     }
 
     setIsLoading(true);
-
     try {
-      let success = false;
-      
-      if (isSignUp) {
-        console.log('🔄 Attempting registration...');
-        success = await register(formData.email, formData.password, stayLoggedIn);
-        console.log('📊 Registration result:', success);
-      } else {
-        console.log('🔄 Attempting login...');
-        success = await login(formData.email, formData.password, stayLoggedIn);
-        console.log('📊 Login result:', success);
+      const success = isLogin 
+        ? await login(email.trim(), password, stayLoggedIn)
+        : await register(email.trim(), password, stayLoggedIn);
+
+      if (!success) {
+        showAlert(
+          'Authentication Failed',
+          isLogin ? 'Login failed. Please check your credentials.' : 'Registration failed. Please try again.'
+        );
       }
     } catch (error) {
       console.error('Authentication error:', error);
-      showAlert(
-        '⚠️ Unexpected Error', 
-        'An unexpected error occurred during authentication.\n\nPlease try again or contact support if the problem persists.',
-        [{ text: 'OK', style: 'default' }]
-      );
     } finally {
       setIsLoading(false);
     }
   };
 
   const toggleAuthMode = () => {
-    setIsSignUp(!isSignUp);
-    setFormData({ email: '', password: '' });
+    setIsLogin(!isLogin);
+    setEmail('');
+    setPassword('');
   };
 
   const toggleStayLoggedIn = () => {
@@ -90,8 +79,8 @@ export default function AuthScreen() {
             style={styles.input}
             placeholder="Email"
             placeholderTextColor="#666"
-            value={formData.email}
-            onChangeText={(text) => setFormData({ ...formData, email: text })}
+            value={email}
+            onChangeText={(text) => setEmail(text)}
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
@@ -101,8 +90,8 @@ export default function AuthScreen() {
             style={styles.input}
             placeholder="Password"
             placeholderTextColor="#666"
-            value={formData.password}
-            onChangeText={(text) => setFormData({ ...formData, password: text })}
+            value={password}
+            onChangeText={(text) => setPassword(text)}
             secureTextEntry
           />
 
@@ -118,14 +107,14 @@ export default function AuthScreen() {
 
           <TouchableOpacity
             style={[styles.button, isLoading && styles.buttonDisabled]}
-            onPress={handleAuthentication}
+            onPress={handleSubmit}
             disabled={isLoading}
           >
             {isLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.buttonText}>
-                {isSignUp ? 'Sign Up' : 'Log In'}
+                {isLogin ? 'Log In' : 'Sign Up'}
               </Text>
             )}
           </TouchableOpacity>
@@ -136,9 +125,9 @@ export default function AuthScreen() {
             disabled={isLoading}
           >
             <Text style={styles.switchText}>
-              {isSignUp 
-                ? 'Already have an account? Log In' 
-                : "Don't have an account? Sign Up"
+              {isLogin 
+                ? 'Don\'t have an account? Sign Up' 
+                : "Already have an account? Log In"
               }
             </Text>
           </TouchableOpacity>

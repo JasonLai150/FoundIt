@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -28,6 +29,15 @@ interface Education {
   major: string;
 }
 
+interface ProfessionalFormData {
+  graduation_date: string;
+  skills: string[];
+  education: Education[];
+  workExperiences: WorkExperience[];
+}
+
+const PROFESSIONAL_CACHE_KEY = 'professional_setup_cache';
+
 export default function ProfessionalSetup() {
   const { createUserExperience, user } = useAuth();
   const router = useRouter();
@@ -39,6 +49,64 @@ export default function ProfessionalSetup() {
   const [education, setEducation] = useState<Education[]>([]);
   const [workExperiences, setWorkExperiences] = useState<WorkExperience[]>([]);
   const [newSkill, setNewSkill] = useState('');
+
+  // Load cached data on component mount
+  useEffect(() => {
+    loadCachedData();
+  }, []);
+
+  // Save to cache whenever form data changes
+  useEffect(() => {
+    saveToCacheDebounced();
+  }, [formData, education, workExperiences]);
+
+  const loadCachedData = async () => {
+    try {
+      const cachedData = await AsyncStorage.getItem(PROFESSIONAL_CACHE_KEY);
+      if (cachedData) {
+        const parsedData: ProfessionalFormData = JSON.parse(cachedData);
+        setFormData({
+          graduation_date: parsedData.graduation_date || '',
+          skills: parsedData.skills || [],
+        });
+        setEducation(parsedData.education || []);
+        setWorkExperiences(parsedData.workExperiences || []);
+      }
+    } catch (error) {
+      console.error('Failed to load cached professional data:', error);
+    }
+  };
+
+  const saveToCache = async () => {
+    try {
+      const dataToCache: ProfessionalFormData = {
+        graduation_date: formData.graduation_date,
+        skills: formData.skills,
+        education,
+        workExperiences,
+      };
+      await AsyncStorage.setItem(PROFESSIONAL_CACHE_KEY, JSON.stringify(dataToCache));
+    } catch (error) {
+      console.error('Failed to save professional data to cache:', error);
+    }
+  };
+
+  // Debounced save to avoid too many cache writes
+  const saveToCacheDebounced = (() => {
+    let timeout: number;
+    return () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(saveToCache, 500);
+    };
+  })();
+
+  const clearCache = async () => {
+    try {
+      await AsyncStorage.removeItem(PROFESSIONAL_CACHE_KEY);
+    } catch (error) {
+      console.error('Failed to clear professional cache:', error);
+    }
+  };
 
   const addSkill = () => {
     if (newSkill.trim() && !formData.skills.includes(newSkill.trim())) {
@@ -119,6 +187,8 @@ export default function ProfessionalSetup() {
       });
 
       if (success) {
+        // Clear cache only after successful submission
+        await clearCache();
         router.push('/profile-setup/socials' as any);
       }
     } catch (error) {
@@ -128,7 +198,9 @@ export default function ProfessionalSetup() {
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    // Clear cache when skipping
+    await clearCache();
     router.push('/profile-setup/socials' as any);
   };
 
@@ -221,37 +293,6 @@ export default function ProfessionalSetup() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Skills</Text>
-            <View style={styles.skillsContainer}>
-              {formData.skills.map((skill, index) => (
-                <View key={index} style={styles.skillTag}>
-                  <Text style={styles.skillText}>{skill}</Text>
-                  <TouchableOpacity
-                    onPress={() => removeSkill(skill)}
-                    style={styles.skillRemove}
-                  >
-                    <Ionicons name="close" size={16} color="#666" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-            <View style={styles.skillInputContainer}>
-              <TextInput
-                style={styles.skillInput}
-                value={newSkill}
-                onChangeText={setNewSkill}
-                placeholder="Add a skill (e.g., React, Python, AWS)"
-                placeholderTextColor="#666"
-                onSubmitEditing={addSkill}
-                returnKeyType="done"
-              />
-              <TouchableOpacity onPress={addSkill} style={styles.addSkillButton}>
-                <Ionicons name="add" size={20} color="#FF5864" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
             <View style={styles.sectionHeader}>
               <Text style={styles.label}>Work Experience</Text>
               <TouchableOpacity onPress={addWorkExperience} style={styles.addButton}>
@@ -333,6 +374,37 @@ export default function ProfessionalSetup() {
                 </TouchableOpacity>
               </View>
             ))}
+          </View>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Skills</Text>
+            <View style={styles.skillsContainer}>
+              {formData.skills.map((skill, index) => (
+                <View key={index} style={styles.skillTag}>
+                  <Text style={styles.skillText}>{skill}</Text>
+                  <TouchableOpacity
+                    onPress={() => removeSkill(skill)}
+                    style={styles.skillRemove}
+                  >
+                    <Ionicons name="close" size={16} color="#666" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+            <View style={styles.skillInputContainer}>
+              <TextInput
+                style={styles.skillInput}
+                value={newSkill}
+                onChangeText={setNewSkill}
+                placeholder="Add a skill (e.g., React, Python, AWS)"
+                placeholderTextColor="#666"
+                onSubmitEditing={addSkill}
+                returnKeyType="done"
+              />
+              <TouchableOpacity onPress={addSkill} style={styles.addSkillButton}>
+                <Ionicons name="add" size={20} color="#FF5864" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>
