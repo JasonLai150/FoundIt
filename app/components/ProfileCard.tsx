@@ -2,12 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
+  Animated,
   Dimensions,
   Image,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
-  View,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { Developer, Skill } from '../models/Developer';
 
@@ -58,35 +61,75 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
   const CARD_WIDTH = dimensions.width;
   const CARD_HEIGHT = dimensions.height;
   
-  const [scrollY, setScrollY] = useState(0);
-  const [contentHeight, setContentHeight] = useState(0);
-  const [scrollViewHeight, setScrollViewHeight] = useState(0);
+  const [flipValue] = useState(new Animated.Value(0));
+  const [isFlipped, setIsFlipped] = useState(false);
 
   const gradientColors = getRoleGradient(developer.role);
 
-  const getBlurOpacity = () => {
-    const maxScroll = Math.max(0, contentHeight - scrollViewHeight);
-    if (maxScroll > 0) {
-      // If content is scrollable, show blur with minimum opacity that increases with scroll
-      const scrollPercentage = Math.min(scrollY / maxScroll, 1);
-      return Math.max(0.6, scrollPercentage * 0.9); // Increased minimum to 0.6 and max to 0.9
-    }
-    // Always show some blur at the bottom if there's content
-    return contentHeight > 0 ? 0.5 : 0; // Increased from 0.3 to 0.5
+  const flipCard = () => {
+    const toValue = isFlipped ? 0 : 1;
+    
+    Animated.timing(flipValue, {
+      toValue,
+      duration: 600,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsFlipped(!isFlipped);
+    });
   };
+
+  const frontRotateY = flipValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
+
+  const backRotateY = flipValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['180deg', '360deg'],
+  });
+
+  const handleSocialLink = (url: string) => {
+    if (url) {
+      const formattedUrl = url.startsWith('http') ? url : `https://${url}`;
+      Linking.openURL(formattedUrl);
+    }
+  };
+
+  const SkillBadge = ({ skill, isTopSkill = false }: { skill: Skill; isTopSkill?: boolean }) => (
+    <View style={[styles.skillBadge, isTopSkill && styles.topSkillBadge]}>
+      <Text style={[styles.skillText, isTopSkill && styles.topSkillText]}>{skill.name}</Text>
+    </View>
+  );
 
   const styles = StyleSheet.create({
     card: {
       width: CARD_WIDTH,
       height: CARD_HEIGHT,
+    },
+    flipContainer: {
+      width: CARD_WIDTH,
+      height: CARD_HEIGHT,
+      position: 'relative',
+    },
+    cardSide: {
+      position: 'absolute',
+      width: '100%',
+      height: '100%',
+      backfaceVisibility: 'hidden',
       borderRadius: 20,
+      overflow: 'hidden',
       backgroundColor: 'white',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 10 },
       shadowOpacity: 0.15,
       shadowRadius: 20,
       elevation: 8,
-      overflow: 'hidden',
+    },
+    frontSide: {
+      transform: [{ rotateY: frontRotateY }],
+    },
+    backSide: {
+      transform: [{ rotateY: backRotateY }],
     },
     
     // Profile Section (Top Half)
@@ -164,7 +207,7 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
       fontWeight: 'bold',
       color: 'white',
       textAlign: 'center',
-      marginBottom: 4,
+      marginBottom: 0,
       textShadowColor: 'rgba(0, 0, 0, 0.3)',
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
@@ -198,17 +241,18 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
       flex: 1,
     },
     scrollContent: {
+      flex: 1,
       paddingHorizontal: 20,
       paddingTop: 20,
     },
     sectionContainer: {
-      marginBottom: 20,
+      marginBottom: 8,
     },
     sectionTitle: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: 'bold',
       color: '#333',
-      marginBottom: 12,
+      marginBottom: 8,
     },
     
     // Skills
@@ -216,6 +260,11 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,
+    },
+    allSkillsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
     },
     skillBadge: {
       backgroundColor: '#f0f2f5',
@@ -242,14 +291,26 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
     // Bio
     bioText: {
       fontSize: 14,
-      lineHeight: 22,
+      lineHeight: 20,
       color: '#666',
+    },
+    
+    // Tap hint
+    tapHint: {
+      fontSize: 12,
+      textAlign: 'center',
+      fontStyle: 'italic',
+      color: '#999',
+      position: 'absolute',
+      bottom: 8,
+      left: 20,
+      right: 20,
     },
     
     // Education
     educationCard: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       backgroundColor: '#f8f9fa',
       paddingHorizontal: 12,
       paddingVertical: 8,
@@ -257,6 +318,7 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
     },
     educationDetails: {
       marginLeft: 8,
+      flex: 1,
     },
     educationText: {
       fontSize: 12,
@@ -264,14 +326,14 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
     },
     educationSchool: {
       fontSize: 12,
-      color: '#666',
-      marginTop: 2,
+      fontWeight: 'bold',
+      color: '#333',
     },
     
     // Work Experience
     workExperienceCard: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       backgroundColor: '#f8f9fa',
       paddingHorizontal: 12,
       paddingVertical: 8,
@@ -279,45 +341,104 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
     },
     workExperienceDetails: {
       marginLeft: 8,
+      flex: 1,
     },
     workExperienceRole: {
-      fontSize: 14,
-      fontWeight: 'bold',
-      color: '#333',
-    },
-    workExperienceCompany: {
-      fontSize: 12,
+      fontSize: 11,
       color: '#666',
       marginTop: 2,
     },
-    workExperienceYears: {
+    workExperienceCompany: {
       fontSize: 12,
+      fontWeight: 'bold',
+      color: '#333',
+    },
+    workExperienceYears: {
+      fontSize: 11,
       color: '#666',
+      marginTop: 2,
+    },
+
+    // Back side specific styles
+    backHeader: {
+      height: '18%',
+      position: 'relative',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+    },
+    backHeaderText: {
+      color: 'white',
+      fontSize: 18,
+      fontWeight: 'bold',
+      textShadowColor: 'rgba(0, 0, 0, 0.3)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
+    backSubText: {
+      color: 'rgba(255, 255, 255, 0.8)',
+      fontSize: 14,
       marginTop: 4,
+      textShadowColor: 'rgba(0, 0, 0, 0.3)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
+    },
+
+    // Back side info section
+    backInfoSection: {
+      height: '82%',
+      backgroundColor: '#f8f9fa',
+      position: 'relative',
     },
     
-    // Blur effect
-    blurContainer: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      height: 60,
-      pointerEvents: 'none',
+    // Social Links
+    socialLinksContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
     },
-    blurGradient: {
-      flex: 1,
+    socialLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#f8f9fa',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 12,
+    },
+    socialLinkText: {
+      fontSize: 12,
+      color: '#333',
+      fontWeight: '500',
+      marginLeft: 6,
+    },
+    backEducationSchool: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: '#333',
+    },
+    backEducationDegree: {
+      fontSize: 12,
+      color: '#666',
+    },
+    backWorkCompany: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: '#333',
+    },
+    backWorkRole: {
+      fontSize: 11,
+      color: '#666',
+      marginTop: 2,
+    },
+    backWorkYears: {
+      fontSize: 11,
+      color: '#666',
+      marginTop: 2,
     },
   });
 
-  const SkillBadge = ({ skill, isTopSkill = false }: { skill: Skill; isTopSkill?: boolean }) => (
-    <View style={[styles.skillBadge, isTopSkill && styles.topSkillBadge]}>
-      <Text style={[styles.skillText, isTopSkill && styles.topSkillText]}>{skill.name}</Text>
-    </View>
-  );
-
-  return (
-    <View style={styles.card}>
+  const renderFrontSide = () => (
+    <Animated.View style={[styles.cardSide, styles.frontSide]}>
       {/* Top Half - Profile Section with Gradient */}
       <LinearGradient
         colors={gradientColors}
@@ -353,21 +474,14 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
         )}
       </LinearGradient>
 
-      {/* Bottom Half - Scrollable Information */}
+      {/* Bottom Half - Non-scrollable Information */}
       <View style={styles.infoSection}>
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          onScroll={({ nativeEvent }) => setScrollY(nativeEvent.contentOffset.y)}
-          onContentSizeChange={(w, h) => setContentHeight(h)}
-          onLayout={({ nativeEvent }) => setScrollViewHeight(nativeEvent.layout.height)}
-        >
+        <View style={styles.scrollContent}>
           {/* About Section */}
           {developer.bio && (
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>About</Text>
-              <Text style={styles.bioText}>{developer.bio}</Text>
+              <Text style={styles.bioText} numberOfLines={2} ellipsizeMode="tail">{developer.bio}</Text>
             </View>
           )}
 
@@ -386,15 +500,15 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Education</Text>
               <View style={styles.educationCard}>
-                <Ionicons name="school" size={18} color="#666" />
+                <Ionicons name="school" size={16} color="#666" />
                 <View style={styles.educationDetails}>
                   {developer.education.includes(',') ? (
                     <>
-                      <Text style={styles.educationText}>
-                        {developer.education.split(',')[0].trim()}
-                      </Text>
                       <Text style={styles.educationSchool}>
                         {developer.education.split(',')[1].trim()}
+                      </Text>
+                      <Text style={styles.educationText}>
+                        {developer.education.split(',')[0].trim()}
                       </Text>
                     </>
                   ) : (
@@ -408,18 +522,134 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
           {/* Work Experience */}
           {developer.company && (
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Work Experience</Text>
+              <Text style={styles.sectionTitle}>Experience</Text>
               <View style={styles.workExperienceCard}>
-                <Ionicons name="briefcase" size={18} color="#666" />
+                <Ionicons name="briefcase" size={16} color="#666" />
                 <View style={styles.workExperienceDetails}>
-                  <Text style={styles.workExperienceRole}>{developer.role}</Text>
                   <Text style={styles.workExperienceCompany}>{developer.company}</Text>
-                  {developer.experience && (
-                    <Text style={styles.workExperienceYears}>
-                      {developer.experience} year{developer.experience !== 1 ? 's' : ''} experience
-                    </Text>
+                  <Text style={styles.workExperienceRole}>
+                    {developer.position || developer.role}
+                    {developer.experience && `, ${developer.experience} year${developer.experience !== 1 ? 's' : ''}`}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Tap hint */}
+          <Text style={styles.tapHint}>
+            Tap to see more details
+          </Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+
+  const renderBackSide = () => (
+    <Animated.View style={[styles.cardSide, styles.backSide]}>
+      {/* Header with same gradient as front */}
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.backHeader}
+      >
+        <Text style={styles.backHeaderText}>{developer.name}</Text>
+        <Text style={styles.backSubText}>Complete Profile</Text>
+      </LinearGradient>
+
+      {/* Detailed Information */}
+      <View style={styles.backInfoSection}>
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* All Skills */}
+          {developer.skills.length > 0 && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>All Skills ({developer.skills.length})</Text>
+              <View style={styles.allSkillsContainer}>
+                {developer.skills.map((skill, index) => (
+                  <SkillBadge key={index} skill={skill} />
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Education */}
+          {developer.education && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Education</Text>
+              <View style={styles.educationCard}>
+                <Ionicons name="school" size={16} color="#666" />
+                <View style={styles.educationDetails}>
+                  {developer.education.includes(',') ? (
+                    <>
+                      <Text style={styles.educationSchool}>
+                        {developer.education.split(',')[1].trim()}
+                      </Text>
+                      <Text style={styles.educationText}>
+                        {developer.education.split(',')[0].trim()}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.educationText}>{developer.education}</Text>
                   )}
                 </View>
+              </View>
+            </View>
+          )}
+
+          {/* Work Experience */}
+          {developer.company && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Experience</Text>
+              <View style={styles.workExperienceCard}>
+                <Ionicons name="briefcase" size={16} color="#666" />
+                <View style={styles.workExperienceDetails}>
+                  <Text style={styles.workExperienceCompany}>{developer.company}</Text>
+                  <Text style={styles.workExperienceRole}>
+                    {developer.position || developer.role}
+                    {developer.experience && `, ${developer.experience} year${developer.experience !== 1 ? 's' : ''}`}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Social Links */}
+          {(developer.github || developer.linkedin || developer.website) && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Connect</Text>
+              <View style={styles.socialLinksContainer}>
+                {developer.github && (
+                  <TouchableOpacity 
+                    style={styles.socialLink}
+                    onPress={() => handleSocialLink(developer.github!)}
+                  >
+                    <Ionicons name="logo-github" size={20} color="#333" />
+                    <Text style={styles.socialLinkText}>GitHub</Text>
+                  </TouchableOpacity>
+                )}
+                {developer.linkedin && (
+                  <TouchableOpacity 
+                    style={styles.socialLink}
+                    onPress={() => handleSocialLink(developer.linkedin!)}
+                  >
+                    <Ionicons name="logo-linkedin" size={20} color="#0077B5" />
+                    <Text style={styles.socialLinkText}>LinkedIn</Text>
+                  </TouchableOpacity>
+                )}
+                {developer.website && (
+                  <TouchableOpacity 
+                    style={styles.socialLink}
+                    onPress={() => handleSocialLink(developer.website!)}
+                  >
+                    <Ionicons name="globe" size={20} color="#007AFF" />
+                    <Text style={styles.socialLinkText}>Website</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           )}
@@ -428,20 +658,20 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
           <View style={{ height: 40 }} />
         </ScrollView>
 
-        {/* Dynamic blur gradient overlay */}
-        <View style={[styles.blurContainer, { opacity: getBlurOpacity() }]}>
-          <LinearGradient
-            colors={[
-              'rgba(248, 249, 250, 0)', 
-              'rgba(248, 249, 250, 0.5)', 
-              'rgba(248, 249, 250, 0.9)', 
-              'rgba(248, 249, 250, 1)'
-            ]}
-            style={styles.blurGradient}
-            pointerEvents="none"
-          />
-        </View>
+        {/* Tap hint */}
+        <Text style={styles.tapHint}>
+          Tap to go back
+        </Text>
       </View>
-    </View>
+    </Animated.View>
+  );
+
+  return (
+    <TouchableOpacity onPress={flipCard} activeOpacity={1} style={styles.card}>
+      <View style={styles.flipContainer}>
+        {renderFrontSide()}
+        {renderBackSide()}
+      </View>
+    </TouchableOpacity>
   );
 } 

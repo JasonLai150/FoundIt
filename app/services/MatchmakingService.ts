@@ -214,7 +214,7 @@ class MatchmakingService {
 
       const swipedUserIds = swipedProfiles.map(action => action.target_user_id);
       const filteredProfiles = profiles.filter(profile => !swipedUserIds.includes(profile.id));
-
+      
       return filteredProfiles;
     } catch (error) {
       console.error('Error filtering swiped profiles:', error);
@@ -245,6 +245,7 @@ class MatchmakingService {
       // Get work experience info  
       const workExperience = experience?.work_experience?.[0];
       const company = workExperience?.company;
+      const position = workExperience?.position;
 
       return {
         id: profile.id,
@@ -255,6 +256,7 @@ class MatchmakingService {
         avatarUrl: profile.avatar_url,
         location: profile.location,
         company,
+        position,
         education: educationString,
         github: profile.github,
         linkedin: profile.linkedin,

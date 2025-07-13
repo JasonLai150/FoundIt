@@ -14,6 +14,7 @@ export type Developer = {
   location?: string;
   experience?: number; // In years
   company?: string;
+  position?: string; // Actual job title/position at the company
   education?: string;
   github?: string;
   linkedin?: string;

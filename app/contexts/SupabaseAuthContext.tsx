@@ -373,50 +373,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateUserProfile = async (userData: Partial<User>): Promise<boolean> => {
-    if (!supabaseUser || !session) {
+      if (!supabaseUser || !session) {
       console.error('Missing authentication for profile update');
-      return false;
-    }
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(userData)
-      .eq('id', supabaseUser.id)
-      .select();
-    
-    if (error) {
+        return false;
+      }
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(userData)
+        .eq('id', supabaseUser.id)
+        .select();
+      
+      if (error) {
       console.error('Database update error:', error);
-      throw error;
-    }
-    
-    if (!data || data.length === 0) {
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
       console.error('No rows updated - profile may not exist');
       throw new Error('Profile not found');
-    }
-    
-    setUser(data[0] as User);
-    return true;
+      }
+      
+      setUser(data[0] as User);
+      return true;
   };
 
   const createUserExperience = async (experienceData: Omit<Experience, 'id' | 'created_at'>): Promise<boolean> => {
-    if (!supabaseUser || !user) {
-      return false;
-    }
+      if (!supabaseUser || !user) {
+        return false;
+      }
 
-    const newExperience = {
-      ...experienceData,
-      profile_id: supabaseUser.id,
-    };
+      const newExperience = {
+        ...experienceData,
+        profile_id: supabaseUser.id,
+      };
 
-    const { error } = await supabase
-      .from('experience')
-      .insert(newExperience);
+      const { error } = await supabase
+        .from('experience')
+        .insert(newExperience);
 
-    if (error) {
-      throw error;
-    }
+      if (error) {
+        throw error;
+      }
 
-    await fetchUserData(supabaseUser.id);
+      await fetchUserData(supabaseUser.id);
     return true;
   };
 

@@ -329,37 +329,37 @@ export default function PersonalInfoSetup() {
             <Text style={styles.label}>Goal *</Text>
             <Text style={styles.hint}>What brings you to FoundIt?</Text>
             <View style={styles.goalContainer}>
-              {GOAL_OPTIONS.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.goalOption,
-                    formData.goal === option.value && styles.goalOptionSelected
-                  ]}
+            {GOAL_OPTIONS.map((option) => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.goalOption,
+                  formData.goal === option.value && styles.goalOptionSelected
+                ]}
                   onPress={() => setFormData({ ...formData, goal: option.value as PersonalFormData['goal'] })}
-                >
+              >
                   <View style={styles.goalOptionContent}>
-                    <Text style={[
+                  <Text style={[
                       styles.goalOptionTitle,
                       formData.goal === option.value && styles.goalOptionTitleSelected
-                    ]}>
-                      {option.title}
-                    </Text>
-                    <Text style={[
+                  ]}>
+                    {option.title}
+                  </Text>
+                  <Text style={[
                       styles.goalOptionDescription,
                       formData.goal === option.value && styles.goalOptionDescriptionSelected
-                    ]}>
-                      {option.description}
-                    </Text>
-                  </View>
-                  <View style={[
+                  ]}>
+                    {option.description}
+                  </Text>
+                </View>
+                <View style={[
                     styles.goalOptionRadio,
                     formData.goal === option.value && styles.goalOptionRadioSelected
-                  ]}>
+                ]}>
                     {formData.goal === option.value && <View style={styles.goalOptionRadioInner} />}
-                  </View>
-                </TouchableOpacity>
-              ))}
+                </View>
+              </TouchableOpacity>
+            ))}
             </View>
           </View>
         </View>

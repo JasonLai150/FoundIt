@@ -67,6 +67,7 @@ export default function ProfileScreen() {
     // Get work experience info  
     const workExperience = experienceData?.work_experience?.[0];
     const company = workExperience?.company;
+    const position = workExperience?.position;
     
     return {
       id: user.id,
@@ -77,6 +78,7 @@ export default function ProfileScreen() {
       avatarUrl: user.avatar_url,
       location: user.location,
       company,
+      position,
       education: educationString,
       github: user.github,
       linkedin: user.linkedin,
@@ -135,7 +137,7 @@ export default function ProfileScreen() {
       <View style={styles.cardContainer}>
         <Text style={styles.cardTitle}>Your Profile Card</Text>
         <ProfileCard developer={userAsDeveloper} />
-      </View>
+        </View>
     );
   };
 
@@ -165,9 +167,9 @@ export default function ProfileScreen() {
                 }}
               />
             ) : (
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={60} color="#ccc" />
-              </View>
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={60} color="#ccc" />
+            </View>
             )}
           </View>
           
@@ -192,7 +194,7 @@ export default function ProfileScreen() {
               <Text style={styles.locationText}>{user.location}</Text>
             </View>
           )}
-
+          
           <TouchableOpacity 
             style={styles.editProfileButton}
             onPress={() => router.push('/edit-profile')}

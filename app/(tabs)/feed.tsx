@@ -114,12 +114,12 @@ export default function FeedScreen() {
           </View>
         ) : developer ? (
           <View style={styles.cardContainer}>
-            <FlippableSwipeCard 
+          <FlippableSwipeCard 
               ref={cardRef}
-              developer={developer} 
-              onSwipeLeft={swipeLeft} 
-              onSwipeRight={swipeRight} 
-            />
+            developer={developer} 
+            onSwipeLeft={swipeLeft} 
+            onSwipeRight={swipeRight} 
+          />
             
             {/* Swipe Buttons */}
             <View style={styles.buttonContainer}>
