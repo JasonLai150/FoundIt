@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { CacheProvider } from './contexts/CacheContext';
+import { ConversationListProvider } from './contexts/ConversationListContext';
 import { AuthProvider } from './contexts/SupabaseAuthContext';
 
 export default function RootLayout() {
@@ -8,11 +9,13 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <CacheProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-            }}
-          />
+          <ConversationListProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+              }}
+            />
+          </ConversationListProvider>
         </CacheProvider>
       </AuthProvider>
     </GestureHandlerRootView>

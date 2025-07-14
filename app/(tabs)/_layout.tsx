@@ -1,7 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import { useUnreadMessageCount } from '../viewmodels/ChatViewModel';
+
+// Custom chat tab icon with badge
+const ChatTabIcon = ({ color, size }: { color: string; size: number }) => {
+  const { unreadCount } = useUnreadMessageCount();
+  
+  return (
+    <View style={styles.tabIconContainer}>
+      <Ionicons name="chatbubble-outline" size={size} color={color} />
+      {unreadCount > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
 
 export default function TabLayout() {
   return (
@@ -34,7 +53,7 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: 'Chat',
-          tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <ChatTabIcon color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -46,4 +65,28 @@ export default function TabLayout() {
       />
     </Tabs>
   );
-} 
+}
+
+const styles = StyleSheet.create({
+  tabIconContainer: {
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FF5864',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+}); 

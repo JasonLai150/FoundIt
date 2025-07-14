@@ -111,6 +111,13 @@ class MatchService {
         .single();
 
       if (mutualLike) {
+        // Check if match already exists
+        const isAlreadyMatched = await this.areUsersMatched(userId, targetUserId);
+        if (isAlreadyMatched) {
+          console.log('Match already exists between users');
+          return;
+        }
+
         // Create a match with consistent ordering (smaller ID first)
         const [user_id_1, user_id_2] = [userId, targetUserId].sort();
         
@@ -326,6 +333,13 @@ class MatchService {
    */
   private async createMatchFromExistingLikes(userId1: string, userId2: string): Promise<boolean> {
     try {
+      // Check if match already exists
+      const isAlreadyMatched = await this.areUsersMatched(userId1, userId2);
+      if (isAlreadyMatched) {
+        console.log('Match already exists between users');
+        return true;
+      }
+
       // Ensure consistent ordering (smaller ID first)
       const [user_id_1, user_id_2] = [userId1, userId2].sort();
       
