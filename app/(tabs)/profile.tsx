@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ProfileCard from '../components/ProfileCard';
+import { useCache } from '../contexts/CacheContext';
 import { useAuth } from '../contexts/SupabaseAuthContext';
 import { Developer, Skill } from '../models/Developer';
 import { showConfirmAlert } from '../utils/alert';
@@ -12,9 +12,13 @@ const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const { user, logout, isAuthenticated, isLoading, fetchUserExperience } = useAuth();
+  const { cache, updateProfileCache, isCacheValid } = useCache();
   const router = useRouter();
-  const [experienceData, setExperienceData] = useState<any>(null);
-  const [loadingExperience, setLoadingExperience] = useState(true);
+  
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Use cached data immediately
+  const experienceData = cache.userExperienceData;
 
   // Navigate to auth page if user is not authenticated
   useEffect(() => {
@@ -25,24 +29,31 @@ export default function ProfileScreen() {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  // Fetch experience data
+  // Background fetch experience data when cache is invalid
   useEffect(() => {
     if (user?.id) {
-      loadExperienceData();
+      const shouldRefresh = !isCacheValid('profile') || !experienceData;
+      
+      if (shouldRefresh) {
+        loadExperienceData(false);
+      }
     }
   }, [user?.id]);
 
-  const loadExperienceData = async () => {
+  const loadExperienceData = async (showRefreshing = true) => {
     if (!user?.id) return;
     
     try {
-      setLoadingExperience(true);
+      if (showRefreshing) {
+        setRefreshing(true);
+      }
+      
       const experience = await fetchUserExperience(user.id);
-      setExperienceData(experience);
+      updateProfileCache(user, experience);
     } catch (error) {
       console.error('Error loading experience data:', error);
     } finally {
-      setLoadingExperience(false);
+      setRefreshing(false);
     }
   };
 
@@ -108,104 +119,75 @@ export default function ProfileScreen() {
     }
   };
 
-  // Show loading state
-  if (isLoading) {
+  const handleRefresh = () => {
+    loadExperienceData(true);
+  };
+
+  // Show user data immediately (no loading screen)
+  if (!isLoading && !isAuthenticated) {
+    return null; // Will redirect to auth
+  }
+
+  if (!user) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text>Loading profile...</Text>
+          <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </SafeAreaView>
     );
   }
-
-  // Show error state if no user
-  if (!isAuthenticated || !user) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text>Please log in to view your profile</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const renderProfileCard = () => {
-    if (!userAsDeveloper) return null;
-
-    return (
-      <View style={styles.cardContainer}>
-        <Text style={styles.cardTitle}>Your Profile Card</Text>
-        <ProfileCard developer={userAsDeveloper} />
-        </View>
-    );
-  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity 
-          style={styles.logoutButton} 
-          onPress={handleLogout}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="log-out-outline" size={24} color="#FF5864" />
-        </TouchableOpacity>
-      </View>
-      
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.profileSection}>
-          <View style={styles.avatarContainer}>
-            {user.avatar_url ? (
-              <Image 
-                source={{ uri: user.avatar_url }} 
-                style={styles.avatar}
-                cachePolicy="memory-disk"
-                onError={(error) => {
-                  console.error('Profile avatar load error:', error.error);
-                }}
-              />
-            ) : (
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={60} color="#ccc" />
-            </View>
-            )}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <View style={{ opacity: refreshing ? 1 : 0 }}>
+            <Text style={styles.refreshText}>Refreshing...</Text>
           </View>
-          
-          <Text style={styles.name}>{user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : 'Your Name'}</Text>
-          <Text style={styles.email}>{user.email || 'your.email@example.com'}</Text>
-          <Text style={styles.role}>{user.role || 'Full Stack Developer'}</Text>
-          
-          {user.goal && (
-            <View style={styles.goalContainer}>
-              <Text style={styles.goalLabel}>Goal:</Text>
-              <Text style={styles.goalText}>
-                {user.goal === 'searching' ? 'Job Searching' :
-                 user.goal === 'recruiting' ? 'Recruiting' :
-                 user.goal === 'investing' ? 'Investing' : 'Networking'}
-              </Text>
-            </View>
-          )}
+        }
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Profile</Text>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
 
-          {user.location && (
-            <View style={styles.locationContainer}>
-              <Ionicons name="location-outline" size={16} color="#666" />
-              <Text style={styles.locationText}>{user.location}</Text>
-            </View>
-          )}
-          
+        {/* Edit Profile Button */}
+        <View style={styles.editProfileContainer}>
           <TouchableOpacity 
             style={styles.editProfileButton}
-            onPress={() => router.push('/edit-profile')}
+            onPress={() => router.push('/profile-setup/personal')}
           >
             <Ionicons name="create-outline" size={20} color="#FF5864" />
             <Text style={styles.editProfileText}>Edit Profile</Text>
           </TouchableOpacity>
-
-          {renderProfileCard()}
         </View>
+
+        {/* Profile Card */}
+        {userAsDeveloper && (
+          <View style={styles.profileCardContainer}>
+            <ProfileCard developer={userAsDeveloper} />
+          </View>
+        )}
       </ScrollView>
+
+      {/* Profile Status - Bottom Right Corner */}
+      <View style={styles.statusCorner}>
+        <View style={styles.statusItem}>
+          <Ionicons name="checkmark-circle" size={16} color="#51cf66" />
+          <Text style={styles.statusText}>Active</Text>
+        </View>
+        <View style={styles.statusItem}>
+          <Ionicons name="eye" size={16} color="#007AFF" />
+          <Text style={styles.statusText}>Visible</Text>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -249,65 +231,62 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  profileSection: {
-    padding: 20,
+  scrollContent: {
+    paddingBottom: 20, // Add some padding at the bottom for the refresh indicator
   },
-  avatarContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  refreshText: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     textAlign: 'center',
+    fontSize: 14,
+    color: '#666',
+    zIndex: 1,
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#666',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+  },
+  refreshButton: {
+    padding: 8,
+  },
+  settingsButton: {
+    padding: 8,
+  },
+  profileCardContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  infoSection: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#333',
-  },
-  email: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  role: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  goalContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 10,
   },
-  goalLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 5,
-  },
-  goalText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#FF5864',
-  },
-  locationContainer: {
+  infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  locationText: {
+  infoText: {
     fontSize: 14,
     color: '#666',
-    marginLeft: 5,
+    marginLeft: 8,
+  },
+  editProfileContainer: {
+    paddingHorizontal: 20,
+    marginTop: 10,
+    alignItems: 'center',
   },
   editProfileButton: {
     flexDirection: 'row',
@@ -318,23 +297,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FF5864',
     borderRadius: 12,
-    marginTop: 20,
     gap: 8,
+    width: '60%',
   },
   editProfileText: {
     fontSize: 16,
     color: '#FF5864',
     fontWeight: '600',
   },
-  cardContainer: {
-    marginTop: 20,
+  statusCorner: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 20,
+    flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    gap: 5,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 15,
+  statusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
   },
 }); 

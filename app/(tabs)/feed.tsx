@@ -17,7 +17,7 @@ import { useFeedViewModel } from '../viewmodels/FeedViewModel';
 const { height: screenHeight } = Dimensions.get('window');
 
 export default function FeedScreen() {
-  const { developer, loading, error, swipeLeft, swipeRight, noMoreDevelopers, refreshProfiles, totalProfiles, currentIndex } = useFeedViewModel();
+  const { developer, loading, refreshing, error, swipeLeft, swipeRight, noMoreDevelopers, refreshProfiles, totalProfiles, currentIndex } = useFeedViewModel();
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -73,8 +73,16 @@ export default function FeedScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Discover</Text>
         
+        {/* Refreshing indicator */}
+        {refreshing && (
+          <View style={styles.refreshingIndicator}>
+            <ActivityIndicator size="small" color="#FF5864" />
+            <Text style={styles.refreshingText}>Refreshing...</Text>
+          </View>
+        )}
+        
         {/* Debug info - can be removed later */}
-        {totalProfiles > 0 && (
+        {totalProfiles > 0 && !refreshing && (
           <Text style={styles.debugText}>
             Profile {currentIndex} of {totalProfiles}
           </Text>
@@ -447,5 +455,17 @@ const styles = StyleSheet.create({
   },
   connectButtonText: {
     color: '#51cf66',
+  },
+  refreshingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  refreshingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#FF5864',
   },
 }); 
