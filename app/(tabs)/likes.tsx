@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, RefreshControl, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import LikeRequestCard from '../components/LikeRequestCard';
+import MessageInputModal from '../components/MessageInputModal';
 import ProfileModal from '../components/ProfileModal';
 import { Developer } from '../models/Developer';
 import { LikeRequest } from '../services/MatchService';
@@ -24,6 +25,10 @@ export default function LikesScreen() {
   const [selectedDeveloper, setSelectedDeveloper] = useState<Developer | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
+  // Message modal state for reciprocal messaging
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [recipientName, setRecipientName] = useState('');
+
   const handleCardPress = (likeRequest: LikeRequest) => {
     const developer = convertToDeveloper(likeRequest);
     if (developer) {
@@ -33,21 +38,63 @@ export default function LikesScreen() {
     }
   };
 
-  const handleModalAccept = async () => {
+  const handleModalAccept = async (message?: string) => {
     if (selectedRequest) {
-      await acceptLikeRequest(selectedRequest.user_id);
-      setModalVisible(false);
-      setSelectedRequest(null);
-      setSelectedDeveloper(null);
+      if (selectedRequest.message && !message) {
+        // They have a message but we want to send one back - show message modal
+        setRecipientName(selectedRequest.profile?.first_name || 'User');
+        
+        // Close the profile modal first to avoid conflicts
+        setModalVisible(false);
+        
+        // Small delay to ensure modal closes before opening new one
+        setTimeout(() => {
+          setShowMessageModal(true);
+        }, 150);
+        return;
+      }
+      
+      const success = await acceptLikeRequest(selectedRequest.user_id, message);
+      if (success) {
+        handleCloseModal();
+      }
     }
+  };
+
+  const handleSendReciprocalMessage = async (message: string) => {
+    if (selectedRequest) {
+      setShowMessageModal(false);
+      const success = await acceptLikeRequest(selectedRequest.user_id, message);
+      if (success) {
+        // Clear all modal state after successful send
+        setSelectedRequest(null);
+        setSelectedDeveloper(null);
+      }
+    }
+  };
+
+  const handleSendWithoutMessage = async () => {
+    if (selectedRequest) {
+      setShowMessageModal(false);
+      const success = await acceptLikeRequest(selectedRequest.user_id);
+      if (success) {
+        // Clear all modal state after successful send
+        setSelectedRequest(null);
+        setSelectedDeveloper(null);
+      }
+    }
+  };
+
+  const handleCancelMessage = () => {
+    setShowMessageModal(false);
+    // Restore the profile modal
+    setModalVisible(true);
   };
 
   const handleModalIgnore = async () => {
     if (selectedRequest) {
       await ignoreLikeRequest(selectedRequest.user_id);
-      setModalVisible(false);
-      setSelectedRequest(null);
-      setSelectedDeveloper(null);
+      handleCloseModal();
     }
   };
 
@@ -131,9 +178,19 @@ export default function LikesScreen() {
       <ProfileModal
         visible={modalVisible}
         developer={selectedDeveloper}
+        incomingMessage={selectedRequest?.message}
         onClose={handleCloseModal}
         onAccept={handleModalAccept}
         onIgnore={handleModalIgnore}
+      />
+
+      {/* Reciprocal Message Modal - at same level to avoid nesting */}
+      <MessageInputModal
+        visible={showMessageModal}
+        recipientName={recipientName}
+        onSend={handleSendReciprocalMessage}
+        onSendWithoutMessage={handleSendWithoutMessage}
+        onCancel={handleCancelMessage}
       />
     </SafeAreaView>
   );

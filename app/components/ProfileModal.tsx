@@ -1,14 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef } from 'react';
-import { Dimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Modal, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Developer } from '../models/Developer';
 import FlippableSwipeCard, { FlippableSwipeCardRef } from './FlippableSwipeCard';
+import MessageBubble from './MessageBubble';
 
 interface ProfileModalProps {
   visible: boolean;
   developer: Developer | null;
+  incomingMessage?: string;
   onClose: () => void;
-  onAccept: () => Promise<void>;
+  onAccept: (message?: string) => Promise<void>;
   onIgnore: () => Promise<void>;
 }
 
@@ -17,6 +19,7 @@ const { height: screenHeight } = Dimensions.get('window');
 export default function ProfileModal({ 
   visible, 
   developer, 
+  incomingMessage,
   onClose, 
   onAccept, 
   onIgnore 
@@ -25,7 +28,6 @@ export default function ProfileModal({
 
   const handleAccept = async () => {
     await onAccept();
-    onClose();
   };
 
   const handleIgnore = async () => {
@@ -47,18 +49,29 @@ export default function ProfileModal({
     <Modal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'}
       onRequestClose={onClose}
+      statusBarTranslucent={Platform.OS === 'android'}
     >
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.closeButton}
             onPress={onClose}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
           >
             <Ionicons name="close" size={24} color="#333" />
           </TouchableOpacity>
         </View>
+        
+        {/* Show incoming message if exists */}
+        {incomingMessage && (
+          <View style={styles.messageContainer}>
+            <Text style={styles.messageLabel}>Message from {developer.name}:</Text>
+            <MessageBubble message={incomingMessage} />
+          </View>
+        )}
         
         <View style={styles.cardContainer}>
           <FlippableSwipeCard
@@ -73,6 +86,8 @@ export default function ProfileModal({
           <TouchableOpacity 
             onPress={handleIgnorePress} 
             style={[styles.actionButton, styles.ignoreButton]}
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            activeOpacity={0.7}
           >
             <Ionicons name="close" size={20} color="#ff6b6b" />
           </TouchableOpacity>
@@ -80,6 +95,8 @@ export default function ProfileModal({
           <TouchableOpacity 
             onPress={handleAcceptPress} 
             style={[styles.actionButton, styles.acceptButton]}
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            activeOpacity={0.7}
           >
             <Ionicons name="heart" size={20} color="#51cf66" />
           </TouchableOpacity>
@@ -96,7 +113,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: Platform.OS === 'android' ? 16 : 8,
     paddingBottom: 8,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -105,6 +122,25 @@ const styles = StyleSheet.create({
   closeButton: {
     alignSelf: 'flex-end',
     padding: 8,
+    minWidth: 40,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  messageContainer: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    alignItems: 'flex-start', // Align message to the left for better layout
+  },
+  messageLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    fontWeight: '500',
+    width: '100%', // Ensure label spans full width
   },
   cardContainer: {
     flex: 1,
@@ -120,6 +156,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+    ...Platform.select({
+      android: {
+        paddingBottom: 24, // Extra padding for Android navigation
+      },
+    }),
   },
   actionButton: {
     width: 60,

@@ -48,7 +48,7 @@ export const useLikeRequestsViewModel = () => {
     }
   };
 
-  const acceptLikeRequest = async (likerUserId: string) => {
+  const acceptLikeRequest = async (likerUserId: string, message?: string) => {
     if (!user?.id) return false;
 
     try {
@@ -56,7 +56,7 @@ export const useLikeRequestsViewModel = () => {
       const updatedRequests = likeRequests.filter(request => request.user_id !== likerUserId);
       updateLikeRequestsCache(updatedRequests);
 
-      const success = await matchService.acceptLikeRequest(user.id, likerUserId);
+      const success = await matchService.acceptLikeRequest(user.id, likerUserId, message);
       
       if (!success) {
         // Rollback on failure

@@ -5,6 +5,7 @@ export interface UserAction {
   user_id: string;
   target_user_id: string;
   action_type: 'like' | 'pass';
+  message?: string;
   created_at: string;
 }
 
@@ -13,7 +14,7 @@ export interface Match {
   user_id_1: string;
   user_id_2: string;
   created_at: string;
-  is_active?: boolean;
+  is_active: boolean;
 }
 
 export interface UserLike {
@@ -28,7 +29,7 @@ export interface LikeRequest {
   user_id: string; // Person who liked the current user
   target_user_id: string; // Current user (who was liked)
   created_at: string;
-  message?: string; // Future messaging support
+  message?: string; // Message attached to the like
   profile?: {
     first_name?: string;
     last_name?: string;
@@ -46,7 +47,7 @@ class MatchService {
   /**
    * Record a user action (swipe right = like, swipe left = pass)
    */
-  async recordUserAction(userId: string, targetUserId: string, actionType: 'like' | 'pass'): Promise<boolean> {
+  async recordUserAction(userId: string, targetUserId: string, actionType: 'like' | 'pass', message?: string): Promise<boolean> {
     try {
       // Check if user has already swiped on this profile
       const { data: existingAction } = await supabase
@@ -68,6 +69,7 @@ class MatchService {
           user_id: userId,
           target_user_id: targetUserId,
           action_type: actionType,
+          message: message || null,
           created_at: new Date().toISOString()
         })
         .select()
@@ -88,6 +90,13 @@ class MatchService {
       console.error('Error in recordUserAction:', error);
       return false;
     }
+  }
+
+  /**
+   * Record a pass action
+   */
+  async recordPass(userId: string, targetUserId: string): Promise<boolean> {
+    return this.recordUserAction(userId, targetUserId, 'pass');
   }
 
   private async checkForMutualMatch(userId: string, targetUserId: string): Promise<void> {
@@ -125,15 +134,8 @@ class MatchService {
   /**
    * Create a match (for swipe right) - simplified method
    */
-  async createMatch(userId: string, targetUserId: string): Promise<boolean> {
-    return this.recordUserAction(userId, targetUserId, 'like');
-  }
-
-  /**
-   * Record a pass (for swipe left)
-   */
-  async recordPass(userId: string, targetUserId: string): Promise<boolean> {
-    return this.recordUserAction(userId, targetUserId, 'pass');
+  async createMatch(userId: string, targetUserId: string, message?: string): Promise<boolean> {
+    return this.recordUserAction(userId, targetUserId, 'like', message);
   }
 
   /**
@@ -182,7 +184,7 @@ class MatchService {
       // Get all users who liked the current user
       const { data: likeActions, error: likesError } = await supabase
         .from('user_actions')
-        .select('id, user_id, target_user_id, created_at')
+        .select('id, user_id, target_user_id, created_at, message')
         .eq('target_user_id', userId)
         .eq('action_type', 'like');
 
@@ -274,7 +276,7 @@ class MatchService {
   /**
    * Accept a like request (create a mutual match)
    */
-  async acceptLikeRequest(currentUserId: string, likerUserId: string): Promise<boolean> {
+  async acceptLikeRequest(currentUserId: string, likerUserId: string, message?: string): Promise<boolean> {
     try {
       // Check if user has already swiped on this profile
       const hasAlreadySwiped = await this.hasUserSwiped(currentUserId, likerUserId);
@@ -300,12 +302,12 @@ class MatchService {
           }
         } else if (existingAction?.action_type === 'pass') {
           // User previously passed - update to like
-          return await this.updatePassToLike(currentUserId, likerUserId);
+          return await this.updatePassToLike(currentUserId, likerUserId, message);
         }
       }
 
       // User hasn't swiped yet - record the like action
-      const success = await this.recordUserAction(currentUserId, likerUserId, 'like');
+      const success = await this.recordUserAction(currentUserId, likerUserId, 'like', message);
       
       if (!success) {
         console.error('Failed to record like action for accepting request');
@@ -350,12 +352,13 @@ class MatchService {
   /**
    * Update a previous pass action to a like
    */
-  private async updatePassToLike(userId: string, targetUserId: string): Promise<boolean> {
+  private async updatePassToLike(userId: string, targetUserId: string, message?: string): Promise<boolean> {
     try {
       const { error } = await supabase
         .from('user_actions')
         .update({
           action_type: 'like',
+          message: message || null,
           created_at: new Date().toISOString() // Update timestamp
         })
         .eq('user_id', userId)
@@ -425,6 +428,7 @@ class MatchService {
         .from('user_actions')
         .update({
           action_type: 'pass',
+          message: null, // Clear message when changing to pass
           created_at: new Date().toISOString() // Update timestamp
         })
         .eq('user_id', userId)
@@ -449,10 +453,15 @@ class MatchService {
    */
   private async deactivateMatchIfExists(userId1: string, userId2: string): Promise<void> {
     try {
+      // Ensure consistent ordering (smaller ID first)
+      const [user_id_1, user_id_2] = [userId1, userId2].sort();
+      
       const { error } = await supabase
         .from('matches')
         .update({ is_active: false })
-        .or(`and(user_id_1.eq.${userId1},user_id_2.eq.${userId2}),and(user_id_1.eq.${userId2},user_id_2.eq.${userId1})`);
+        .eq('user_id_1', user_id_1)
+        .eq('user_id_2', user_id_2)
+        .eq('is_active', true);
 
       if (error) {
         console.error('Error deactivating match:', error);
@@ -582,23 +591,27 @@ class MatchService {
    */
   async areUsersMatched(userId1: string, userId2: string): Promise<boolean> {
     try {
-      // Use a simpler approach - check both possible orderings separately
-      const [smallerId, largerId] = [userId1, userId2].sort();
+      // Ensure consistent ordering (smaller ID first)
+      const [user_id_1, user_id_2] = [userId1, userId2].sort();
       
       const { data, error } = await supabase
         .from('matches')
         .select('id')
-        .eq('user_id_1', smallerId)
-        .eq('user_id_2', largerId)
+        .eq('user_id_1', user_id_1)
+        .eq('user_id_2', user_id_2)
         .eq('is_active', true)
-        .limit(1);
+        .single();
 
       if (error) {
+        // Handle "not found" error (users are not matched)
+        if (error.code === 'PGRST116') {
+          return false;
+        }
         console.error('❌ Error checking if users matched:', error);
         return false;
       }
 
-      return data && data.length > 0;
+      return !!data;
     } catch (error) {
       console.error('❌ Error in areUsersMatched:', error);
       return false;

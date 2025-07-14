@@ -181,8 +181,8 @@ class MatchmakingService {
         return [];
       }
 
-      // Filter out profiles that the user has already swiped on
-      const filteredProfiles = await this.filterOutAlreadySwipedProfiles(currentUserId, data);
+      // Filter out profiles that the user has already interacted with (swiped on or matched with)
+      const filteredProfiles = await this.filterOutAlreadyInteractedProfiles(currentUserId, data);
 
       // Transform database results to Developer model
       return this.transformProfilesToDevelopers(filteredProfiles);
@@ -194,30 +194,55 @@ class MatchmakingService {
   }
 
   /**
-   * Filter out profiles that the user has already swiped on
+   * Filter out profiles that the user has already interacted with (swiped on or matched with)
    */
-  private async filterOutAlreadySwipedProfiles(userId: string, profiles: any[]): Promise<any[]> {
+  private async filterOutAlreadyInteractedProfiles(userId: string, profiles: any[]): Promise<any[]> {
     try {
-      const { data: swipedProfiles, error } = await supabase
+      // Get profiles that user has already swiped on (liked or passed)
+      const { data: swipedProfiles, error: swipedError } = await supabase
         .from('user_actions')
         .select('target_user_id')
         .eq('user_id', userId);
 
-      if (error) {
-        console.error('Error fetching user actions:', error);
-        return profiles;
+      if (swipedError) {
+        console.error('Error fetching user actions:', swipedError);
       }
 
-      if (!swipedProfiles || swipedProfiles.length === 0) {
-        return profiles;
+      // Get profiles that user has already matched with
+      const { data: matchedProfiles, error: matchedError } = await supabase
+        .from('matches')
+        .select('user_id_1, user_id_2')
+        .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`);
+
+      if (matchedError) {
+        console.error('Error fetching matches:', matchedError);
       }
 
-      const swipedUserIds = swipedProfiles.map(action => action.target_user_id);
-      const filteredProfiles = profiles.filter(profile => !swipedUserIds.includes(profile.id));
+      // Collect all user IDs to exclude
+      const excludedUserIds = new Set<string>();
+
+      // Add swiped profiles
+      if (swipedProfiles && swipedProfiles.length > 0) {
+        swipedProfiles.forEach(action => {
+          excludedUserIds.add(action.target_user_id);
+        });
+      }
+
+      // Add matched profiles
+      if (matchedProfiles && matchedProfiles.length > 0) {
+        matchedProfiles.forEach(match => {
+          // Add the other user in the match
+          const otherUserId = match.user_id_1 === userId ? match.user_id_2 : match.user_id_1;
+          excludedUserIds.add(otherUserId);
+        });
+      }
+
+      // Filter out excluded profiles
+      const filteredProfiles = profiles.filter(profile => !excludedUserIds.has(profile.id));
       
       return filteredProfiles;
     } catch (error) {
-      console.error('Error filtering swiped profiles:', error);
+      console.error('Error filtering already interacted profiles:', error);
       return profiles;
     }
   }

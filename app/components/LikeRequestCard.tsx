@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LikeRequest } from '../services/MatchService';
+import MessageBubble from './MessageBubble';
 
 interface LikeRequestCardProps {
   likeRequest: LikeRequest;
@@ -11,6 +12,9 @@ interface LikeRequestCardProps {
   onPress: () => void;
 }
 
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const isLandscape = screenWidth > screenHeight;
+
 export default function LikeRequestCard({ 
   likeRequest, 
   onAccept, 
@@ -18,6 +22,7 @@ export default function LikeRequestCard({
   onPress 
 }: LikeRequestCardProps) {
   const profile = likeRequest.profile;
+  const hasMessage = !!likeRequest.message;
   const displayName = profile?.first_name && profile?.last_name 
     ? `${profile.first_name} ${profile.last_name}`
     : 'Unknown User';
@@ -31,8 +36,16 @@ export default function LikeRequestCard({
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity style={styles.cardContent} onPress={onPress}>
+    <View style={[
+      styles.container, 
+      isLandscape && styles.containerLandscape
+    ]}>
+      <TouchableOpacity 
+        style={[styles.cardContent, hasMessage && styles.cardContentWithMessage]} 
+        onPress={onPress}
+        activeOpacity={0.7}
+        hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}
+      >
         <View style={styles.avatarContainer}>
           {profile?.avatar_url ? (
             <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
@@ -44,34 +57,45 @@ export default function LikeRequestCard({
         </View>
         
         <View style={styles.profileInfo}>
-          <Text style={styles.name}>{displayName}</Text>
-          <Text style={styles.role}>{profile?.role || 'Developer'}</Text>
+          <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
+            {displayName}
+          </Text>
+          <Text style={styles.role} numberOfLines={1} ellipsizeMode="tail">
+            {profile?.role || 'Developer'}
+          </Text>
           {profile?.location && (
-            <Text style={styles.location}>{profile.location}</Text>
-          )}
-          {profile?.bio && (
-            <Text style={styles.bio} numberOfLines={2}>
-              {profile.bio}
+            <Text style={styles.location} numberOfLines={1} ellipsizeMode="tail">
+              {profile.location}
             </Text>
           )}
         </View>
       </TouchableOpacity>
       
-      <View style={styles.actionButtons}>
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.ignoreButton]} 
-          onPress={handleIgnore}
-        >
-          <Ionicons name="close" size={24} color="#ff6b6b" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.acceptButton]} 
-          onPress={handleAccept}
-        >
-          <Ionicons name="heart" size={24} color="#51cf66" />
-        </TouchableOpacity>
-      </View>
+      {hasMessage ? (
+        <View style={styles.messageSection}>
+          <MessageBubble message={likeRequest.message!} isPreview />
+        </View>
+      ) : (
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.ignoreButton]} 
+            onPress={handleIgnore}
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={24} color="#ff6b6b" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.acceptButton]} 
+            onPress={handleAccept}
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="heart" size={24} color="#51cf66" />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -89,12 +113,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+    overflow: 'visible',
+    minHeight: 100, // Ensure consistent card height
+  },
+  containerLandscape: {
+    width: '60%',
+    alignSelf: 'center',
   },
   cardContent: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    minHeight: 100,
+  },
+  cardContentWithMessage: {
+    flex: 0.5, // Take up exactly 50% when message is present
+    paddingRight: 8, // Reduce right padding when sharing space with message
   },
   avatarContainer: {
     marginRight: 12,
@@ -114,6 +149,7 @@ const styles = StyleSheet.create({
   },
   profileInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   name: {
     fontSize: 18,
@@ -129,17 +165,22 @@ const styles = StyleSheet.create({
   location: {
     fontSize: 12,
     color: '#999',
-    marginBottom: 4,
+    marginBottom: 0,
   },
-  bio: {
-    fontSize: 13,
-    color: '#666',
-    lineHeight: 16,
+  messageSection: {
+    flex: 0.5, // Take up exactly 50% when message is present
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingRight: 16,
+    paddingLeft: 8,
+    minHeight: 100,
   },
   actionButtons: {
     flexDirection: 'row',
     paddingRight: 16,
     gap: 8,
+    alignItems: 'center',
+    // No flex specified - takes only the space it needs
   },
   actionButton: {
     width: 48,

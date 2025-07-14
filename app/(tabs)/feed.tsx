@@ -12,12 +12,30 @@ import {
   View
 } from 'react-native';
 import FlippableSwipeCard, { FlippableSwipeCardRef } from '../components/FlippableSwipeCard';
+import MessageInputModal from '../components/MessageInputModal';
 import { useFeedViewModel } from '../viewmodels/FeedViewModel';
 
 const { height: screenHeight } = Dimensions.get('window');
 
 export default function FeedScreen() {
-  const { developer, loading, refreshing, error, swipeLeft, swipeRight, noMoreDevelopers, refreshProfiles, totalProfiles, currentIndex } = useFeedViewModel();
+  const { 
+    developer, 
+    loading, 
+    refreshing, 
+    error, 
+    swipeLeft, 
+    swipeRight, 
+    noMoreDevelopers, 
+    refreshProfiles, 
+    totalProfiles, 
+    currentIndex,
+    showMessageModal,
+    pendingLikeTarget,
+    handleSendMessage,
+    handleSendWithoutMessage,
+    handleCancelMessage
+  } = useFeedViewModel();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -143,6 +161,15 @@ export default function FeedScreen() {
           </View>
         ) : null}
       </View>
+
+      {/* Message Input Modal */}
+      <MessageInputModal
+        visible={showMessageModal}
+        recipientName={pendingLikeTarget?.name || ''}
+        onSend={handleSendMessage}
+        onSendWithoutMessage={handleSendWithoutMessage}
+        onCancel={handleCancelMessage}
+      />
 
       {/* Filter Modal */}
       <Modal
