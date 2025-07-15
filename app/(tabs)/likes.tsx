@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, RefreshControl, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import LikeRequestCard from '../components/LikeRequestCard';
 import MessageInputModal from '../components/MessageInputModal';
 import ProfileModal from '../components/ProfileModal';
@@ -151,12 +151,25 @@ export default function LikesScreen() {
       </View>
       
       {likeRequests.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No like requests yet</Text>
-          <Text style={styles.emptySubText}>
-            When someone likes you, they'll appear here
-          </Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.emptyScrollContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refreshRequests}
+              colors={['#FF5864']}
+              tintColor="#FF5864"
+            />
+          }
+        >
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No like requests yet</Text>
+            <Text style={styles.emptySubText}>
+              When someone likes you, they&apos;ll appear here
+            </Text>
+          </View>
+        </ScrollView>
       ) : (
         <FlatList
           data={likeRequests}
@@ -262,5 +275,8 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingTop: 16,
     paddingBottom: 20,
+  },
+  emptyScrollContainer: {
+    flexGrow: 1,
   },
 }); 

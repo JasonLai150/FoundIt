@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { useCache } from '../contexts/CacheContext';
 import { useAuth } from '../contexts/SupabaseAuthContext';
 import { Developer } from '../models/Developer';
@@ -25,6 +26,37 @@ export const useLikeRequestsViewModel = () => {
       fetchLikeRequests(false); // Background refresh
     }
   }, [user?.id]);
+
+  // Refresh likes when app comes back into focus (more aggressive than cache context)
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active' && user?.id) {
+        // Always fetch when app comes back into focus to catch new likes immediately
+        fetchLikeRequests(false);
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [user?.id]);
+
+  // Also check for new likes every 30 seconds when the screen is active
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const interval = setInterval(() => {
+      // Only auto-refresh if cache is older than 30 seconds and we're not currently refreshing
+      if (!refreshing && !loading) {
+        const lastFetch = cache.likeRequestsLastFetch;
+        const now = Date.now();
+        if (!lastFetch || (now - lastFetch) > 30000) { // 30 seconds
+          fetchLikeRequests(false);
+        }
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [user?.id, refreshing, loading, cache.likeRequestsLastFetch]);
 
   const fetchLikeRequests = async (showLoading = true) => {
     if (!user?.id) return;

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { Developer, Skill } from '../models/Developer';
 import { LikeRequest } from '../services/MatchService';
 import { useAuth } from './SupabaseAuthContext';
@@ -26,13 +27,14 @@ interface CacheContextType {
   updateProfileCache: (userData: any, experienceData: any) => void;
   invalidateCache: (cacheType?: 'feed' | 'likes' | 'profile' | 'all') => void;
   isCacheValid: (cacheType: 'feed' | 'likes' | 'profile', maxAgeMinutes?: number) => boolean;
+  forceRefreshAllCaches: () => void;
 }
 
 const CacheContext = createContext<CacheContextType | undefined>(undefined);
 
 const CACHE_DURATION = {
   feed: 5, // 5 minutes
-  likes: 2, // 2 minutes (more frequent for likes)
+  likes: 1, // 1 minute (more frequent for likes to catch new ones faster)
   profile: 10, // 10 minutes
 };
 
@@ -68,6 +70,19 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
         profileLastFetch: null,
       }));
     }
+  }, [user?.id]);
+
+  // Auto-refresh likes cache when app comes back into focus
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active' && user?.id) {
+        // App came back into focus - invalidate likes cache to check for new likes
+        invalidateCache('likes');
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
   }, [user?.id]);
 
   const updateFeedCache = (profiles: Developer[], currentIndex: number, hasMore: boolean) => {
@@ -165,6 +180,16 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  // Force refresh all caches - useful for debugging and testing
+  const forceRefreshAllCaches = () => {
+    setCache(prev => ({
+      ...prev,
+      feedLastFetch: null,
+      likeRequestsLastFetch: null,
+      profileLastFetch: null,
+    }));
+  };
+
   const isCacheValid = (cacheType: 'feed' | 'likes' | 'profile', maxAgeMinutes?: number): boolean => {
     const lastFetch = cacheType === 'feed' ? cache.feedLastFetch :
                      cacheType === 'likes' ? cache.likeRequestsLastFetch :
@@ -201,15 +226,18 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
     return Math.round(totalMonths / 12 * 10) / 10; // Round to 1 decimal place
   };
 
+  const value: CacheContextType = {
+    cache,
+    updateFeedCache,
+    updateLikeRequestsCache,
+    updateProfileCache,
+    invalidateCache,
+    isCacheValid,
+    forceRefreshAllCaches,
+  };
+
   return (
-    <CacheContext.Provider value={{
-      cache,
-      updateFeedCache,
-      updateLikeRequestsCache,
-      updateProfileCache,
-      invalidateCache,
-      isCacheValid,
-    }}>
+    <CacheContext.Provider value={value}>
       {children}
     </CacheContext.Provider>
   );

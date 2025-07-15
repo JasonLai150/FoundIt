@@ -2,7 +2,6 @@ import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import {
   Animated,
   Dimensions,
-  PanResponder,
   Platform,
   StyleSheet,
   View
@@ -33,12 +32,12 @@ const getCardDimensions = () => {
   if (isLandscape) {
     return {
       width: screenWidth * 0.6,
-      height: screenHeight * 0.65, // Increased since buttons are separate
+      height: screenHeight * 0.65,
     };
   } else {
     return {
       width: screenWidth * 0.9,
-      height: screenHeight * 0.6, // Increased since buttons are separate  
+      height: screenHeight * 0.6,
     };
   }
 };
@@ -56,14 +55,20 @@ const FlippableSwipeCard = forwardRef<FlippableSwipeCardRef, FlippableSwipeCardP
   const translateY = useRef(new Animated.Value(0)).current;
   const rotate = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
     
-  const handleSwipeEnd = (translationX: number) => {
+  const handleSwipeEnd = (translationX: number, velocityX: number) => {
     const threshold = CARD_WIDTH * 0.3;
+    const velocityThreshold = 500;
     
-    if (translationX > threshold) {
+    // Consider velocity for more responsive swiping
+    const shouldSwipeRight = translationX > threshold || (translationX > 50 && velocityX > velocityThreshold);
+    const shouldSwipeLeft = translationX < -threshold || (translationX < -50 && velocityX < -velocityThreshold);
+    
+    if (shouldSwipeRight) {
       // Swipe right - like
       animateOut(CARD_WIDTH * 1.5, onSwipeRight);
-    } else if (translationX < -threshold) {
+    } else if (shouldSwipeLeft) {
       // Swipe left - pass
       animateOut(-CARD_WIDTH * 1.5, onSwipeLeft);
     } else {
@@ -73,93 +78,112 @@ const FlippableSwipeCard = forwardRef<FlippableSwipeCardRef, FlippableSwipeCardP
   };
 
   const animateOut = (toValue: number, callback: () => void) => {
-      Animated.parallel([
-        Animated.timing(translateX, {
+    Animated.parallel([
+      Animated.timing(translateX, {
         toValue,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateY, {
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
         toValue: -100,
-          duration: 300,
-          useNativeDriver: true,
-        }),
+        duration: 300,
+        useNativeDriver: true,
+      }),
       Animated.timing(rotate, {
         toValue: toValue > 0 ? 0.3 : -0.3,
-          duration: 300,
-          useNativeDriver: true,
-        }),
+        duration: 300,
+        useNativeDriver: true,
+      }),
       Animated.timing(scale, {
         toValue: 0.8,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
       callback();
-        resetPosition();
-      });
+      resetPosition();
+    });
   };
 
   const resetPosition = () => {
-      Animated.parallel([
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
-        Animated.spring(translateY, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
+    Animated.parallel([
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }),
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }),
       Animated.spring(rotate, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 100,
-          friction: 8,
-        }),
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }),
       Animated.spring(scale, {
         toValue: 1,
         useNativeDriver: true,
         tension: 100,
         friction: 8,
       }),
-      ]).start();
+      Animated.spring(opacity, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }),
+    ]).start();
   };
 
-  // Pan gesture handlers
-  const onGestureEvent = Animated.event(
-    [
-      {
-        nativeEvent: {
-          translationX: translateX,
-          translationY: translateY,
-        },
-      },
-    ],
-    { useNativeDriver: true }
-  );
+  // Mobile gesture handlers with true real-time card movement
+  const onGestureEvent = (event: PanGestureHandlerGestureEvent) => {
+    const { translationX: tx, translationY: ty } = event.nativeEvent;
+    
+    // Always update position for real-time card movement (Tinder-style)
+    translateX.setValue(tx);
+    translateY.setValue(ty * 0.5); // Reduce vertical movement for better UX
+    
+    // Apply visual effects based on horizontal movement
+    const rotationValue = tx * 0.0008;
+    const scaleValue = 1 - Math.abs(tx * 0.0001);
+    const opacityValue = 1 - Math.abs(tx * 0.0008); // Fade as card moves away
+    
+    rotate.setValue(rotationValue);
+    scale.setValue(Math.max(0.9, scaleValue));
+    opacity.setValue(Math.max(0.3, opacityValue)); // Don't fade completely
+  };
 
   const onHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
-    if (event.nativeEvent.state === State.END) {
-      handleSwipeEnd(event.nativeEvent.translationX);
+    const { state } = event.nativeEvent;
+    
+    if (state === State.END) {
+      const { translationX: tx, translationY: ty, velocityX, velocityY } = event.nativeEvent;
+      
+      // Only trigger swipe if horizontal movement dominates
+      const horizontalDominance = Math.abs(tx) > Math.abs(ty) * 1.2;
+      const hasHorizontalVelocity = Math.abs(velocityX) > Math.abs(velocityY);
+      
+      if (horizontalDominance || hasHorizontalVelocity) {
+        handleSwipeEnd(tx, velocityX);
+      } else {
+        // Reset position if it was primarily vertical movement
+        resetPosition();
+      }
+    } else if (state === State.CANCELLED || state === State.FAILED) {
+      // Reset position if gesture was cancelled or failed
+      resetPosition();
     }
   };
-
-  // Pan responder for web
-  const panResponder = PanResponder.create({
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (_, gestureState) => {
-      translateX.setValue(gestureState.dx);
-      translateY.setValue(gestureState.dy);
-      rotate.setValue(gestureState.dx * 0.001);
-    },
-    onPanResponderRelease: (_, gestureState) => {
-      handleSwipeEnd(gestureState.dx);
-    },
-  });
 
   const handlePassPress = () => {
     animateOut(-CARD_WIDTH * 1.5, onSwipeLeft);
@@ -181,10 +205,11 @@ const FlippableSwipeCard = forwardRef<FlippableSwipeCardRef, FlippableSwipeCardP
       { translateY },
       { rotate: rotate.interpolate({
           inputRange: [-1, 1],
-        outputRange: ['-30deg', '30deg'],
+          outputRange: ['-30deg', '30deg'],
       }) },
       { scale },
     ],
+    opacity,
   };
 
   const styles = StyleSheet.create({
@@ -209,23 +234,31 @@ const FlippableSwipeCard = forwardRef<FlippableSwipeCardRef, FlippableSwipeCardP
     </View>
   );
 
-  // Use PanGestureHandler for mobile, PanResponder for web
+  // Platform-specific implementations
   if (Platform.OS === 'web') {
-    return (
-      <Animated.View {...panResponder.panHandlers}>
-        {renderCard()}
-      </Animated.View>
-    );
+    // Web: No gestures, button-only experience
+    return renderCard();
   }
 
+  // Mobile: Advanced gesture handling with Tinder-style movement
   return (
     <PanGestureHandler
       onGestureEvent={onGestureEvent}
       onHandlerStateChange={onHandlerStateChange}
+      shouldCancelWhenOutside={false}
+      enableTrackpadTwoFingerGesture={false}
+      activeOffsetX={[-3, 3]}
+      activeOffsetY={[-20, 20]}
+      failOffsetY={[-30, 30]}
+      minPointers={1}
+      maxPointers={1}
+      avgTouches={false}
     >
       {renderCard()}
     </PanGestureHandler>
   );
 });
+
+FlippableSwipeCard.displayName = 'FlippableSwipeCard';
 
 export default FlippableSwipeCard; 

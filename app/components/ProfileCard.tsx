@@ -6,12 +6,17 @@ import {
   Dimensions,
   Image,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
+import {
+  State,
+  TapGestureHandler,
+} from 'react-native-gesture-handler';
 import { Developer, Education, Skill, WorkExperience } from '../models/Developer';
 
 const getCardDimensions = () => {
@@ -63,6 +68,10 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
   
   const [flipValue] = useState(new Animated.Value(0));
   const [isFlipped, setIsFlipped] = useState(false);
+  
+  // Use keys to ensure ScrollViews are completely independent
+  const [frontScrollKey] = useState(() => `front-scroll-${Math.random()}`);
+  const [backScrollKey] = useState(() => `back-scroll-${Math.random()}`);
 
   const gradientColors = getRoleGradient(developer.role);
 
@@ -304,11 +313,13 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
     },
     scrollView: {
       flex: 1,
+      backgroundColor: 'transparent',
     },
     scrollContent: {
-      flex: 1,
+      flexGrow: 1,
       paddingHorizontal: 20,
       paddingTop: 20,
+      paddingBottom: 20,
     },
     sectionContainer: {
       marginBottom: 8,
@@ -578,7 +589,17 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
 
       {/* Bottom Half - Non-scrollable Information */}
       <View style={styles.infoSection}>
-        <View style={styles.scrollContent}>
+        <ScrollView 
+          key={frontScrollKey}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled={Platform.OS === 'android'}
+          bounces={Platform.OS === 'ios'}
+          scrollEventThrottle={16}
+          removeClippedSubviews={false}
+          maintainVisibleContentPosition={null}
+        >
           {/* About Section */}
           {developer.bio && (
             <View style={styles.sectionContainer}>
@@ -673,7 +694,7 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
           <Text style={styles.tapHint}>
             Tap to see more details
           </Text>
-        </View>
+        </ScrollView>
       </View>
     </Animated.View>
   );
@@ -694,9 +715,15 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
       {/* Detailed Information */}
       <View style={styles.backInfoSection}>
         <ScrollView 
+          key={backScrollKey}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          nestedScrollEnabled={Platform.OS === 'android'}
+          bounces={Platform.OS === 'ios'}
+          scrollEventThrottle={16}
+          removeClippedSubviews={false}
+          maintainVisibleContentPosition={null}
         >
           {/* About Me Section */}
           {developer.bio && (
@@ -820,11 +847,17 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
   );
 
   return (
-    <TouchableOpacity onPress={flipCard} activeOpacity={1} style={styles.card}>
-      <View style={styles.flipContainer}>
-        {renderFrontSide()}
-        {renderBackSide()}
+    <TapGestureHandler onHandlerStateChange={({ nativeEvent }) => {
+      if (nativeEvent.state === State.END) {
+        flipCard();
+      }
+    }}>
+      <View style={styles.card}>
+        <View style={styles.flipContainer}>
+          {renderFrontSide()}
+          {renderBackSide()}
+        </View>
       </View>
-    </TouchableOpacity>
+    </TapGestureHandler>
   );
 } 

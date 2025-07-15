@@ -4,7 +4,9 @@ import {
   ActivityIndicator,
   Dimensions,
   Modal,
+  RefreshControl,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -128,39 +130,56 @@ export default function FeedScreen() {
         </View>
       </View>
       
-      <View style={styles.content}>
-        {loading ? (
-          <ActivityIndicator size="large" color="#FF5864" />
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
-        ) : noMoreDevelopers ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No more developers to show</Text>
-            <Text style={styles.emptySubText}>Check back later for more matches</Text>
-          </View>
-        ) : developer ? (
-          <View style={styles.cardContainer}>
-          <FlippableSwipeCard 
-              ref={cardRef}
-            developer={developer} 
-            onSwipeLeft={swipeLeft} 
-            onSwipeRight={swipeRight} 
-          />
-            
-            {/* Swipe Buttons */}
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity onPress={handlePassPress} style={[styles.swipeButton, styles.passButton]}>
-                <Ionicons name="close" size={20} color="#ff6b6b" />
-                <Text style={[styles.swipeButtonText, styles.passButtonText]}>Pass</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleConnectPress} style={[styles.swipeButton, styles.connectButton]}>
-                <Ionicons name="heart" size={20} color="#51cf66" />
-                <Text style={[styles.swipeButtonText, styles.connectButtonText]}>Connect</Text>
-              </TouchableOpacity>
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        refreshControl={
+          // Only enable refresh when no developer is shown (empty state)
+          !developer ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => refreshProfiles({})}
+              colors={['#FF5864']}
+              tintColor="#FF5864"
+            />
+          ) : undefined
+        }
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={!developer} // Disable scroll when card is present
+      >
+        <View style={styles.content}>
+          {loading ? (
+            <ActivityIndicator size="large" color="#FF5864" />
+          ) : error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : noMoreDevelopers ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No more developers to show</Text>
+              <Text style={styles.emptySubText}>Check back later for more matches</Text>
             </View>
-          </View>
-        ) : null}
-      </View>
+          ) : developer ? (
+            <View style={styles.cardContainer}>
+            <FlippableSwipeCard 
+                ref={cardRef}
+              developer={developer} 
+              onSwipeLeft={swipeLeft} 
+              onSwipeRight={swipeRight} 
+            />
+              
+              {/* Swipe Buttons */}
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity onPress={handlePassPress} style={[styles.swipeButton, styles.passButton]}>
+                  <Ionicons name="close" size={20} color="#ff6b6b" />
+                  <Text style={[styles.swipeButtonText, styles.passButtonText]}>Pass</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleConnectPress} style={[styles.swipeButton, styles.connectButton]}>
+                  <Ionicons name="heart" size={20} color="#51cf66" />
+                  <Text style={[styles.swipeButtonText, styles.connectButtonText]}>Connect</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </ScrollView>
 
       {/* Message Input Modal */}
       <MessageInputModal
@@ -494,5 +513,8 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 14,
     color: '#FF5864',
+  },
+  scrollContainer: {
+    flexGrow: 1,
   },
 }); 

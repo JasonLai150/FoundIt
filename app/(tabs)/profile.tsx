@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ProfileCard from '../components/ProfileCard';
 import { useCache } from '../contexts/CacheContext';
 import { useAuth } from '../contexts/SupabaseAuthContext';
@@ -103,9 +103,12 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <View style={{ opacity: refreshing ? 1 : 0 }}>
-            <Text style={styles.refreshText}>Refreshing...</Text>
-          </View>
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={['#FF5864']}
+            tintColor="#FF5864"
+          />
         }
       >
         {/* Header */}
@@ -191,16 +194,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 20, // Add some padding at the bottom for the refresh indicator
-  },
-  refreshText: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-    fontSize: 14,
-    color: '#666',
-    zIndex: 1,
   },
   loadingText: {
     fontSize: 18,

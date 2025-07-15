@@ -236,7 +236,7 @@ export default function PersonalInfoSetup() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Personal Information</Text>
-        <Text style={styles.subtitle}>Let's get to know you better</Text>
+        <Text style={styles.subtitle}>Let&apos;s get to know you better</Text>
         <View style={styles.progressContainer}>
           <View style={[styles.progressDot, styles.progressActive]} />
           <View style={styles.progressDot} />

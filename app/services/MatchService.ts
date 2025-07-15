@@ -193,7 +193,8 @@ class MatchService {
         .from('user_actions')
         .select('id, user_id, target_user_id, created_at, message')
         .eq('target_user_id', userId)
-        .eq('action_type', 'like');
+        .eq('action_type', 'like')
+        .order('created_at', { ascending: false }); // Newest first
 
       if (likesError) {
         console.error('❌ Error fetching like requests:', likesError);
@@ -207,7 +208,7 @@ class MatchService {
       // Get all actions the current user has taken
       const { data: userActions, error: userActionsError } = await supabase
         .from('user_actions')
-        .select('target_user_id')
+        .select('target_user_id, action_type')
         .eq('user_id', userId);
 
       if (userActionsError) {
@@ -215,65 +216,66 @@ class MatchService {
         return [];
       }
 
-      const userActionTargets = new Set(userActions?.map(action => action.target_user_id) || []);
-
-      // Filter out users who are already matched OR where current user has already taken action
-      const filteredLikeRequests = await Promise.all(
-        likeActions.map(async (like) => {
-          // Skip if current user has already taken any action on this person
-          if (userActionTargets.has(like.user_id)) {
-            return null;
-          }
-
-          // Skip if already matched
-          const isMatched = await this.areUsersMatched(like.user_id, userId);
-          if (isMatched) {
-            return null;
-          }
-
-          return like;
-        })
+      // Only exclude users where current user has 'liked' them (not passed)
+      const userLikedTargets = new Set(
+        userActions?.filter(action => action.action_type === 'like')
+          .map(action => action.target_user_id) || []
       );
 
-      const validLikeRequests = filteredLikeRequests.filter(like => like !== null);
+      // Filter out users step by step
+      const validLikeRequests = [];
+      
+      for (const like of likeActions) {
+        // Only skip if current user has already LIKED this person (allow if they passed)
+        if (userLikedTargets.has(like.user_id)) {
+          continue;
+        }
+        
+        // Check if already matched
+        const isMatched = await this.areUsersMatched(like.user_id, userId);
+        if (isMatched) {
+          continue;
+        }
+        
+        validLikeRequests.push(like);
+      }
 
       if (validLikeRequests.length === 0) {
         return [];
       }
 
-      // Get profile details for each person who liked the user
-      const likeRequestsWithProfiles = await Promise.all(
-        validLikeRequests.map(async (like) => {
-          try {
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('first_name, last_name, role, location, avatar_url, bio, github, linkedin, website')
-              .eq('id', like.user_id)
-              .single();
+      // Get profile data for all valid like requests
+      const userIds = validLikeRequests.map(like => like.user_id);
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, role, location, avatar_url, bio, github, linkedin, website')
+        .in('id', userIds);
 
-            if (profileError) {
-              console.error('Error fetching profile for like request:', profileError);
-              return {
-                ...like,
-                profile: undefined
-              };
-            }
+      if (profilesError) {
+        console.error('❌ Error fetching profiles for like requests:', profilesError);
+        return [];
+      }
 
-            return {
-              ...like,
-              profile
-            };
-          } catch (error) {
-            console.error('Error fetching profile for like request:', error);
-            return {
-              ...like,
-              profile: undefined
-            };
-          }
-        })
-      );
+      // Combine like data with profile data
+      const result = validLikeRequests.map(like => {
+        const profile = profiles?.find(profile => profile.id === like.user_id);
+        return {
+          ...like,
+          profile: profile ? {
+            first_name: profile.first_name,
+            last_name: profile.last_name,
+            role: profile.role,
+            location: profile.location,
+            avatar_url: profile.avatar_url,
+            bio: profile.bio,
+            github: profile.github,
+            linkedin: profile.linkedin,
+            website: profile.website,
+          } : undefined
+        };
+      });
 
-      return likeRequestsWithProfiles;
+      return result;
     } catch (error) {
       console.error('❌ Error in getLikeRequests:', error);
       return [];
@@ -605,27 +607,32 @@ class MatchService {
    */
   async areUsersMatched(userId1: string, userId2: string): Promise<boolean> {
     try {
-      // Ensure consistent ordering (smaller ID first)
-      const [user_id_1, user_id_2] = [userId1, userId2].sort();
-      
-      const { data, error } = await supabase
+      // Try both possible orderings since we're not sure how they were stored
+      const { data: match1, error: error1 } = await supabase
         .from('matches')
-        .select('id')
-        .eq('user_id_1', user_id_1)
-        .eq('user_id_2', user_id_2)
+        .select('id, is_active')
+        .eq('user_id_1', userId1)
+        .eq('user_id_2', userId2)
         .eq('is_active', true)
-        .single();
+        .maybeSingle(); // Use maybeSingle to avoid error when no match found
 
-      if (error) {
-        // Handle "not found" error (users are not matched)
-        if (error.code === 'PGRST116') {
-          return false;
-        }
-        console.error('❌ Error checking if users matched:', error);
-        return false;
+      const { data: match2, error: error2 } = await supabase
+        .from('matches')
+        .select('id, is_active')
+        .eq('user_id_1', userId2)
+        .eq('user_id_2', userId1)
+        .eq('is_active', true)
+        .maybeSingle(); // Use maybeSingle to avoid error when no match found
+
+      if (error1 && error1.code !== 'PGRST116') {
+        console.error('❌ Error checking match (query 1):', error1);
+      }
+      
+      if (error2 && error2.code !== 'PGRST116') {
+        console.error('❌ Error checking match (query 2):', error2);
       }
 
-      return !!data;
+      return !!(match1 || match2);
     } catch (error) {
       console.error('❌ Error in areUsersMatched:', error);
       return false;
