@@ -9,8 +9,9 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
+import { useCache } from '../contexts/CacheContext';
 import { useAuth } from '../contexts/SupabaseAuthContext';
 import { showAlert } from '../utils/alert';
 
@@ -53,6 +54,7 @@ const PERSONAL_CACHE_KEY = 'personal_setup_cache';
 
 export default function PersonalInfoSetup() {
   const { updateUserProfile, user } = useAuth();
+  const { cache, updateProfileCache } = useCache();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<PersonalFormData>({
@@ -199,7 +201,18 @@ export default function PersonalInfoSetup() {
       const success = await updateUserProfile(updateData);
 
       if (success) {
-        // Clear cache only after successful submission
+        // Update cache with new user data and existing experience data
+        const currentExperienceData = cache.userProfile ? {
+          id: cache.userProfile.experience_id,
+          education: cache.userProfile.educationEntries || [],
+          work_experience: cache.userProfile.workExperiences || [],
+          skills: cache.userProfile.skills.map(skill => skill.name) || [],
+          graduation_date: cache.userProfile.graduation_date,
+        } : null;
+        
+        updateProfileCache({ ...user, ...updateData }, currentExperienceData);
+        
+        // Clear local cache only after successful submission
         await clearCache();
         router.push('/profile-setup/professional' as any);
       } else {

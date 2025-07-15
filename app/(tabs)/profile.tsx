@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dimensions, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ProfileCard from '../components/ProfileCard';
 import { useCache } from '../contexts/CacheContext';
 import { useAuth } from '../contexts/SupabaseAuthContext';
-import { Developer, Skill } from '../models/Developer';
 import { showConfirmAlert } from '../utils/alert';
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
@@ -17,8 +16,8 @@ export default function ProfileScreen() {
   
   const [refreshing, setRefreshing] = useState(false);
 
-  // Use cached data immediately
-  const experienceData = cache.userExperienceData;
+  // Use cached Developer profile directly
+  const userAsDeveloper = cache.userProfile;
 
   // Navigate to auth page if user is not authenticated
   useEffect(() => {
@@ -32,13 +31,13 @@ export default function ProfileScreen() {
   // Background fetch experience data when cache is invalid
   useEffect(() => {
     if (user?.id) {
-      const shouldRefresh = !isCacheValid('profile') || !experienceData;
+      const shouldRefresh = !isCacheValid('profile') || !userAsDeveloper;
       
       if (shouldRefresh) {
         loadExperienceData(false);
       }
     }
-  }, [user?.id]);
+  }, [user?.id, userAsDeveloper]);
 
   const loadExperienceData = async (showRefreshing = true) => {
     if (!user?.id) return;
@@ -56,47 +55,6 @@ export default function ProfileScreen() {
       setRefreshing(false);
     }
   };
-
-  // Convert user data to Developer format for the profile card
-  const userAsDeveloper: Developer | null = useMemo(() => {
-    if (!user) return null;
-    
-    // Transform skills from experience data
-    const skills: Skill[] = experienceData?.skills ? 
-      experienceData.skills.map((skillName: string, index: number) => ({
-        id: `${user.id}_${index}`,
-        name: skillName,
-        level: 'Intermediate' as const
-      })) : [];
-
-    // Get education info
-    const education = experienceData?.education?.[0];
-    const educationString = education ? 
-      `${education.degree || ''} ${education.major || ''}, ${education.school_name || ''}`.trim() : 
-      undefined;
-
-    // Get work experience info  
-    const workExperience = experienceData?.work_experience?.[0];
-    const company = workExperience?.company;
-    const position = workExperience?.position;
-    
-    return {
-      id: user.id,
-      name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Your Name',
-      bio: user.bio || 'Add a bio to tell others about yourself...',
-      role: user.role || 'Developer',
-      skills,
-      avatarUrl: user.avatar_url,
-      location: user.location,
-      company,
-      position,
-      education: educationString,
-      github: user.github,
-      linkedin: user.linkedin,
-      website: user.website,
-      looking: user.goal === 'searching',
-    };
-  }, [user, experienceData]);
 
   const handleLogout = () => {
     showConfirmAlert(
@@ -162,7 +120,7 @@ export default function ProfileScreen() {
         <View style={styles.editProfileContainer}>
           <TouchableOpacity 
             style={styles.editProfileButton}
-            onPress={() => router.push('/profile-setup/personal')}
+            onPress={() => router.push('/profile-setup/edit-profile')}
           >
             <Ionicons name="create-outline" size={20} color="#FF5864" />
             <Text style={styles.editProfileText}>Edit Profile</Text>

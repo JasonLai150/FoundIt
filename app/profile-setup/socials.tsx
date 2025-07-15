@@ -4,15 +4,16 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { useCache } from '../contexts/CacheContext';
 import { useAuth } from '../contexts/SupabaseAuthContext';
 import { showAlert } from '../utils/alert';
 import { deleteAvatar, pickAndUploadAvatar } from '../utils/avatarUpload';
@@ -29,6 +30,7 @@ const SOCIALS_CACHE_KEY = 'socials_setup_cache';
 
 export default function SocialsSetup() {
   const { updateUserProfile, user } = useAuth();
+  const { cache, updateProfileCache } = useCache();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -196,17 +198,30 @@ export default function SocialsSetup() {
 
     setIsLoading(true);
     try {
-      const success = await updateUserProfile({
+      const updateData = {
         github: formData.github.trim() || undefined,
         linkedin: formData.linkedin.trim() || undefined,
         website: formData.website.trim() || undefined,
         bio: formData.bio.trim() || undefined,
         avatar_url: avatarUrl || undefined,
         profile_complete: true, // Mark profile as complete
-      });
+      };
+
+      const success = await updateUserProfile(updateData);
 
       if (success) {
-        // Clear cache only after successful submission
+        // Update cache with complete profile data
+        const currentExperienceData = cache.userProfile ? {
+          id: cache.userProfile.experience_id,
+          education: cache.userProfile.educationEntries || [],
+          work_experience: cache.userProfile.workExperiences || [],
+          skills: cache.userProfile.skills.map(skill => skill.name) || [],
+          graduation_date: cache.userProfile.graduation_date,
+        } : null;
+        
+        updateProfileCache({ ...user, ...updateData }, currentExperienceData);
+        
+        // Clear local cache only after successful submission
         await clearCache();
         router.replace('/(tabs)/feed');
         
@@ -231,12 +246,25 @@ export default function SocialsSetup() {
     setIsLoading(true);
     try {
       // Mark profile as complete even if socials are skipped
-      const success = await updateUserProfile({ 
+      const updateData = { 
         profile_complete: true,
         avatar_url: avatarUrl || undefined,
-      });
+      };
+      
+      const success = await updateUserProfile(updateData);
       if (success) {
-        // Clear cache when skipping
+        // Update cache with complete profile data
+        const currentExperienceData = cache.userProfile ? {
+          id: cache.userProfile.experience_id,
+          education: cache.userProfile.educationEntries || [],
+          work_experience: cache.userProfile.workExperiences || [],
+          skills: cache.userProfile.skills.map(skill => skill.name) || [],
+          graduation_date: cache.userProfile.graduation_date,
+        } : null;
+        
+        updateProfileCache({ ...user, ...updateData }, currentExperienceData);
+        
+        // Clear local cache when skipping
         await clearCache();
         router.replace('/(tabs)/feed');
       }
@@ -249,7 +277,13 @@ export default function SocialsSetup() {
   };
 
   const handleBack = () => {
-    router.back();
+    // Check if we can go back in the navigation stack
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Fallback: navigate to profile page if no navigation history
+      router.replace('/(tabs)/profile');
+    }
   };
 
   const addProtocol = (url: string) => {

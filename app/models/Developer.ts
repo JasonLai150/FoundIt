@@ -4,6 +4,21 @@ export type Skill = {
   level: 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
 };
 
+export type Education = {
+  school_name: string;
+  degree?: string;
+  major?: string;
+};
+
+export type WorkExperience = {
+  company: string;
+  position: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  current?: boolean;
+};
+
 export type Developer = {
   id: string;
   name: string;
@@ -16,6 +31,11 @@ export type Developer = {
   company?: string;
   position?: string; // Actual job title/position at the company
   education?: string;
+  // Rich structured data (new)
+  educationEntries?: Education[];
+  workExperiences?: WorkExperience[];
+  graduation_date?: string;
+  experience_id?: string; // Database ID for the experience record
   github?: string;
   linkedin?: string;
   website?: string;

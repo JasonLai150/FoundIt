@@ -2,18 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { ChatMessage } from '../models/Chat';
 import { useChatViewModel } from '../viewmodels/ChatViewModel';
@@ -29,6 +29,16 @@ export default function ChatDetailScreen() {
   
   const [messageText, setMessageText] = useState('');
   const flatListRef = useRef<FlatList>(null);
+
+  const handleBack = () => {
+    // Check if we can go back in the navigation stack
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Fallback: navigate to conversations list if no navigation history
+      router.replace('/(tabs)/chat');
+    }
+  };
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -112,7 +122,7 @@ export default function ChatDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color="#FF5864" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Chat</Text>
@@ -129,7 +139,7 @@ export default function ChatDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color="#FF5864" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Chat</Text>
@@ -148,7 +158,7 @@ export default function ChatDetailScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#FF5864" />
         </TouchableOpacity>
         

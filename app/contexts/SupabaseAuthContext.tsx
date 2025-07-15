@@ -175,6 +175,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           profile_complete: data.profile_complete,
         };
         setUser(userData);
+        
+        // Automatically fetch and cache experience data for immediate use
+        try {
+          const experienceData = await fetchUserExperience(userId);
+          // Note: We can't directly call updateProfileCache here due to circular dependency
+          // The cache will be populated when components load and check for valid cache
+          console.log('Experience data fetched for cache:', experienceData ? 'Available' : 'None');
+        } catch (expError) {
+          console.error('Error fetching experience data during login:', expError);
+        }
       }
     } catch (error) {
       console.error('Exception in fetchUserData:', error);

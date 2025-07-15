@@ -3,33 +3,20 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useAuth } from './contexts/SupabaseAuthContext';
-import { showAlert } from './utils/alert';
-import { deleteAvatar, pickAndUploadAvatar } from './utils/avatarUpload';
-
-interface WorkExperience {
-  company: string;
-  position: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  current: boolean;
-}
-
-interface Education {
-  school_name: string;
-  degree: string;
-  major: string;
-}
+import { useCache } from '../contexts/CacheContext';
+import { useAuth } from '../contexts/SupabaseAuthContext';
+import { Education, WorkExperience } from '../models/Developer';
+import { showAlert } from '../utils/alert';
+import { deleteAvatar, pickAndUploadAvatar } from '../utils/avatarUpload';
 
 const GOAL_OPTIONS = [
   { value: 'searching', title: 'Job Searching', description: 'Looking for new career opportunities' },
@@ -39,7 +26,8 @@ const GOAL_OPTIONS = [
 ];
 
 export default function EditProfile() {
-  const { user, updateUserProfile, createUserExperience, fetchUserExperience, updateUserExperience } = useAuth();
+  const { user, updateUserProfile, createUserExperience, updateUserExperience } = useAuth();
+  const { cache, updateProfileCache, isCacheValid } = useCache();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
@@ -47,18 +35,21 @@ export default function EditProfile() {
   const [cacheBuster, setCacheBuster] = useState('');
   const [existingExperienceId, setExistingExperienceId] = useState<string | null>(null);
 
-  // Form data states
-  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || '');
+  // Use cached Developer profile directly
+  const userAsDeveloper = cache.userProfile;
+
+  // Form data states - populated from Developer model
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [personalData, setPersonalData] = useState({
-    first_name: user?.first_name || '',
-    last_name: user?.last_name || '',
-    birth_day: user?.dob ? user.dob.split('-')[2] : '',
-    birth_month: user?.dob ? user.dob.split('-')[1] : '',
-    birth_year: user?.dob ? user.dob.split('-')[0] : '',
-    city: user?.location ? user.location.split(',')[0]?.trim() : '',
-    state: user?.location ? user.location.split(',')[1]?.trim() : '',
-    role: user?.role || '',
-    goal: user?.goal || 'searching' as 'recruiting' | 'searching' | 'investing' | 'other',
+    first_name: '',
+    last_name: '',
+    birth_day: '',
+    birth_month: '',
+    birth_year: '',
+    city: '',
+    state: '',
+    role: '',
+    goal: 'searching' as 'recruiting' | 'searching' | 'investing' | 'other',
   });
 
   const [professionalData, setProfessionalData] = useState({
@@ -69,49 +60,71 @@ export default function EditProfile() {
   });
 
   const [socialData, setSocialData] = useState({
-    github: user?.github || '',
-    linkedin: user?.linkedin || '',
-    website: user?.website || '',
+    github: '',
+    linkedin: '',
+    website: '',
   });
 
   const [bioData, setBioData] = useState({
-    bio: user?.bio || '',
+    bio: '',
   });
 
   const [newSkill, setNewSkill] = useState('');
 
-  // Load existing professional data when component mounts
+  // Re-sync all user data when userAsDeveloper changes
   useEffect(() => {
-    if (user?.id) {
-      loadExistingProfessionalData();
-    }
-  }, [user?.id]);
+    if (userAsDeveloper) {
+      // Update personal data from user object
+      setPersonalData({
+        first_name: user?.first_name || '',
+        last_name: user?.last_name || '',
+        birth_day: user?.dob ? user.dob.split('-')[2] : '',
+        birth_month: user?.dob ? user.dob.split('-')[1] : '',
+        birth_year: user?.dob ? user.dob.split('-')[0] : '',
+        city: userAsDeveloper.location ? userAsDeveloper.location.split(',')[0]?.trim() : '',
+        state: userAsDeveloper.location ? userAsDeveloper.location.split(',')[1]?.trim() : '',
+        role: userAsDeveloper.role || '',
+        goal: userAsDeveloper.looking ? 'searching' : 'other' as 'recruiting' | 'searching' | 'investing' | 'other',
+      });
 
-  const loadExistingProfessionalData = async () => {
-    if (!user?.id) return;
-    
-    try {
-      const experienceData = await fetchUserExperience(user.id);
-      if (experienceData) {
-        setExistingExperienceId(experienceData.id || null);
-        setProfessionalData({
-          graduation_date: experienceData.graduation_date || '',
-          skills: experienceData.skills || [],
-          education: (experienceData.education || []).map((edu: any) => ({
-            school_name: edu.school_name || '',
-            degree: edu.degree || '',
-            major: edu.major || ''
-          })),
-          work_experience: experienceData.work_experience || [],
-        });
+      // Update professional data from Developer model
+      setProfessionalData({
+        graduation_date: userAsDeveloper.graduation_date || '',
+        skills: userAsDeveloper.skills.map(skill => skill.name),
+        education: userAsDeveloper.educationEntries || [],
+        work_experience: userAsDeveloper.workExperiences || [],
+      });
+
+      // Set existing experience ID if available
+      if (userAsDeveloper.experience_id) {
+        setExistingExperienceId(userAsDeveloper.experience_id);
       }
-    } catch (error) {
-      console.error('Error loading existing professional data:', error);
+
+      // Update social data
+      setSocialData({
+        github: userAsDeveloper.github || '',
+        linkedin: userAsDeveloper.linkedin || '',
+        website: userAsDeveloper.website || '',
+      });
+
+      // Update bio data
+      setBioData({
+        bio: userAsDeveloper.bio || '',
+      });
+
+      // Update avatar URL
+      setAvatarUrl(userAsDeveloper.avatarUrl || '');
     }
-  };
+  }, [userAsDeveloper, user]);
 
   const handleBack = () => {
-    router.back();
+    // Check if we can go back in the navigation stack
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Fallback: navigate to profile page if no navigation history
+      router.replace('/(tabs)/profile');
+    }
   };
 
   const handleAvatarUpload = async () => {
@@ -176,6 +189,15 @@ export default function EditProfile() {
 
       if (success) {
         setEditingSection(null);
+        // Update cache with new user data - need to extract experience data for cache function
+        const experienceData = {
+          id: userAsDeveloper?.experience_id,
+          education: userAsDeveloper?.educationEntries || [],
+          work_experience: userAsDeveloper?.workExperiences || [],
+          skills: userAsDeveloper?.skills.map(skill => skill.name) || [],
+          graduation_date: userAsDeveloper?.graduation_date,
+        };
+        updateProfileCache({ ...user, ...updateData }, experienceData);
       } else {
         showAlert('Error', 'Failed to update personal information. Please try again.');
       }
@@ -191,7 +213,7 @@ export default function EditProfile() {
     setIsLoading(true);
     try {
       const validWorkExperiences = professionalData.work_experience.filter((exp: WorkExperience) => 
-        exp.company.trim() && exp.position.trim()
+        exp.company?.trim() && exp.position?.trim()
       );
 
       if (existingExperienceId) {
@@ -205,6 +227,15 @@ export default function EditProfile() {
         });
         if (success) {
           setEditingSection(null);
+          // Update cache with updated experience data
+          const experienceData = {
+            id: existingExperienceId,
+            education: professionalData.education.length > 0 ? professionalData.education : undefined,
+            graduation_date: professionalData.graduation_date.trim() || undefined,
+            skills: professionalData.skills.length > 0 ? professionalData.skills : undefined,
+            work_experience: validWorkExperiences.length > 0 ? validWorkExperiences : undefined,
+          };
+          updateProfileCache(user, experienceData);
         }
       } else {
         // Create new experience
@@ -217,8 +248,14 @@ export default function EditProfile() {
         });
         if (success) {
           setEditingSection(null);
-          // Reload the data to get the new experience ID
-          await loadExistingProfessionalData();
+          // Update cache with new experience data
+          const experienceData = {
+            education: professionalData.education.length > 0 ? professionalData.education : undefined,
+            graduation_date: professionalData.graduation_date.trim() || undefined,
+            skills: professionalData.skills.length > 0 ? professionalData.skills : undefined,
+            work_experience: validWorkExperiences.length > 0 ? validWorkExperiences : undefined,
+          };
+          updateProfileCache(user, experienceData);
         }
       }
     } catch (error) {
@@ -232,14 +269,25 @@ export default function EditProfile() {
   const handleSaveSocial = async () => {
     setIsLoading(true);
     try {
-      const success = await updateUserProfile({
+      const updateData = {
         github: socialData.github.trim() || undefined,
         linkedin: socialData.linkedin.trim() || undefined,
         website: socialData.website.trim() || undefined,
-      });
+      };
+
+      const success = await updateUserProfile(updateData);
 
       if (success) {
         setEditingSection(null);
+        // Update cache with new user data
+        const experienceData = {
+          id: userAsDeveloper?.experience_id,
+          education: userAsDeveloper?.educationEntries || [],
+          work_experience: userAsDeveloper?.workExperiences || [],
+          skills: userAsDeveloper?.skills.map(skill => skill.name) || [],
+          graduation_date: userAsDeveloper?.graduation_date,
+        };
+        updateProfileCache({ ...user, ...updateData }, experienceData);
       }
     } catch (error) {
       console.error('Error updating social links:', error);
@@ -252,12 +300,23 @@ export default function EditProfile() {
   const handleSaveBio = async () => {
     setIsLoading(true);
     try {
-      const success = await updateUserProfile({
+      const updateData = {
         bio: bioData.bio.trim() || undefined,
-      });
+      };
+
+      const success = await updateUserProfile(updateData);
 
       if (success) {
         setEditingSection(null);
+        // Update cache with new user data
+        const experienceData = {
+          id: userAsDeveloper?.experience_id,
+          education: userAsDeveloper?.educationEntries || [],
+          work_experience: userAsDeveloper?.workExperiences || [],
+          skills: userAsDeveloper?.skills.map(skill => skill.name) || [],
+          graduation_date: userAsDeveloper?.graduation_date,
+        };
+        updateProfileCache({ ...user, ...updateData }, experienceData);
       }
     } catch (error) {
       console.error('Error updating bio:', error);
@@ -701,32 +760,68 @@ export default function EditProfile() {
         </View>
       ) : (
         <View style={styles.displayForm}>
+          {/* Education Display */}
           {professionalData.education.length > 0 && (
-            <View style={styles.displayItem}>
-              <Text style={styles.displayLabel}>Education</Text>
+            <View style={styles.displaySubSection}>
+              <Text style={styles.displaySubSectionTitle}>Education</Text>
               {professionalData.education.map((edu, index) => (
-                <Text key={index} style={styles.displayValue}>
-                  {[edu.degree, edu.major].filter(Boolean).join(' in ')} - {edu.school_name}
-                </Text>
+                <View key={index} style={styles.displayCard}>
+                  <Text style={styles.displayCardTitle}>
+                    {[edu.degree, edu.major].filter(Boolean).join(' in ')}
+                  </Text>
+                  <Text style={styles.displayCardSubtitle}>{edu.school_name}</Text>
+                  {professionalData.graduation_date && (
+                    <Text style={styles.displayCardDetail}>
+                      Graduation: {professionalData.graduation_date}
+                    </Text>
+                  )}
+                </View>
               ))}
             </View>
           )}
+
+          {/* Work Experience Display */}
           {professionalData.work_experience.length > 0 && (
-            <View style={styles.displayItem}>
-              <Text style={styles.displayLabel}>Work Experience</Text>
+            <View style={styles.displaySubSection}>
+              <Text style={styles.displaySubSectionTitle}>Work Experience</Text>
               {professionalData.work_experience.map((exp, index) => (
-                <Text key={index} style={styles.displayValue}>
-                  {exp.position} at {exp.company}
-                </Text>
+                <View key={index} style={styles.displayCard}>
+                  <Text style={styles.displayCardTitle}>{exp.position}</Text>
+                  <Text style={styles.displayCardSubtitle}>{exp.company}</Text>
+                  {(exp.startDate || exp.endDate || exp.current) && (
+                    <Text style={styles.displayCardDetail}>
+                      {exp.startDate} - {exp.current ? 'Present' : exp.endDate}
+                    </Text>
+                  )}
+                  {exp.description && (
+                    <Text style={styles.displayCardDescription}>{exp.description}</Text>
+                  )}
+                </View>
               ))}
             </View>
           )}
+
+          {/* Skills Display */}
           {professionalData.skills.length > 0 && (
-            <View style={styles.displayItem}>
-              <Text style={styles.displayLabel}>Skills</Text>
-              <Text style={styles.displayValue}>
-                {professionalData.skills.join(', ')}
-              </Text>
+            <View style={styles.displaySubSection}>
+              <Text style={styles.displaySubSectionTitle}>Skills</Text>
+              <View style={styles.displaySkillsContainer}>
+                {professionalData.skills.map((skill, index) => (
+                  <View key={index} style={styles.displaySkillTag}>
+                    <Text style={styles.displaySkillText}>{skill}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Show message if no professional details */}
+          {professionalData.education.length === 0 && 
+           professionalData.work_experience.length === 0 && 
+           professionalData.skills.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>No professional details added yet</Text>
+              <Text style={styles.emptyStateSubtext}>Tap Edit to add your education, work experience, and skills</Text>
             </View>
           )}
         </View>
@@ -753,7 +848,8 @@ export default function EditProfile() {
         <View style={styles.editForm}>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>
-              <Ionicons name="logo-github" size={16} color="#333" /> GitHub
+              <Ionicons name="logo-github" size={16} color="#333" />
+              <Text> GitHub</Text>
             </Text>
             <TextInput
               style={styles.input}
@@ -765,7 +861,8 @@ export default function EditProfile() {
           </View>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>
-              <Ionicons name="logo-linkedin" size={16} color="#0077B5" /> LinkedIn
+              <Ionicons name="logo-linkedin" size={16} color="#0077B5" />
+              <Text> LinkedIn</Text>
             </Text>
             <TextInput
               style={styles.input}
@@ -777,7 +874,8 @@ export default function EditProfile() {
           </View>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>
-              <Ionicons name="globe-outline" size={16} color="#333" /> Website
+              <Ionicons name="globe-outline" size={16} color="#333" />
+              <Text> Website</Text>
             </Text>
             <TextInput
               style={styles.input}
@@ -1304,5 +1402,83 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'right',
     marginTop: 4,
+  },
+  displaySubSection: {
+    marginBottom: 24,
+  },
+  displaySubSectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  displayCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  displayCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  displayCardSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  displayCardDetail: {
+    fontSize: 13,
+    color: '#999',
+    marginBottom: 4,
+  },
+  displayCardDescription: {
+    fontSize: 14,
+    color: '#333',
+    marginTop: 4,
+  },
+  displaySkillsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  displaySkillTag: {
+    backgroundColor: '#FF5864',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  displaySkillText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    marginTop: 20,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#666',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#FF5864',
+    fontSize: 16,
   },
 }); 

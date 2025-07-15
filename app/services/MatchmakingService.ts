@@ -283,6 +283,9 @@ class MatchmakingService {
         company,
         position,
         education: educationString,
+        // Rich structured data
+        educationEntries: experience?.education || [],
+        workExperiences: experience?.work_experience || [],
         github: profile.github,
         linkedin: profile.linkedin,
         website: profile.website,

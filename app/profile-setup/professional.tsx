@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useCache } from '../contexts/CacheContext';
 import { useAuth } from '../contexts/SupabaseAuthContext';
 
 interface WorkExperience {
@@ -40,6 +41,7 @@ const PROFESSIONAL_CACHE_KEY = 'professional_setup_cache';
 
 export default function ProfessionalSetup() {
   const { createUserExperience, user } = useAuth();
+  const { cache, updateProfileCache } = useCache();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -178,16 +180,21 @@ export default function ProfessionalSetup() {
         exp.company.trim() && exp.position.trim()
       );
 
-      const success = await createUserExperience({
+      const experienceData = {
         profile_id: user!.id,
         education: education.length > 0 ? education : undefined,
         graduation_date: formData.graduation_date.trim() || undefined,
         skills: formData.skills.length > 0 ? formData.skills : undefined,
         work_experience: validWorkExperiences.length > 0 ? validWorkExperiences : undefined,
-      });
+      };
+
+      const success = await createUserExperience(experienceData);
 
       if (success) {
-        // Clear cache only after successful submission
+        // Update cache with new experience data
+        updateProfileCache(user, experienceData);
+        
+        // Clear local cache only after successful submission
         await clearCache();
         router.push('/profile-setup/socials' as any);
       }
@@ -205,7 +212,13 @@ export default function ProfessionalSetup() {
   };
 
   const handleBack = () => {
-    router.back();
+    // Check if we can go back in the navigation stack
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // Fallback: navigate to profile page if no navigation history
+      router.replace('/(tabs)/profile');
+    }
   };
 
   return (

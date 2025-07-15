@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { Developer, Skill } from '../models/Developer';
+import { Developer, Education, Skill, WorkExperience } from '../models/Developer';
 
 const getCardDimensions = () => {
   const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
@@ -95,9 +95,74 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
     }
   };
 
+  const formatDate = (dateString: string | undefined): string => {
+    if (!dateString) return '';
+    try {
+      // Handle YYYY-MM format explicitly to avoid month parsing issues
+      if (dateString.match(/^\d{4}-\d{2}$/)) {
+        const [year, month] = dateString.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1); // month is 0-indexed in Date constructor
+        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      }
+      // For other date formats, try normal parsing
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatDateRange = (startDate: string | undefined, endDate: string | undefined, current: boolean | undefined): string => {
+    const start = formatDate(startDate);
+    if (current) {
+      return start ? `${start} - Present` : 'Present';
+    }
+    const end = formatDate(endDate);
+    if (start && end) {
+      return `${start} - ${end}`;
+    } else if (start) {
+      return start;
+    } else if (end) {
+      return end;
+    }
+    return '';
+  };
+
   const SkillBadge = ({ skill, isTopSkill = false }: { skill: Skill; isTopSkill?: boolean }) => (
     <View style={[styles.skillBadge, isTopSkill && styles.topSkillBadge]}>
       <Text style={[styles.skillText, isTopSkill && styles.topSkillText]}>{skill.name}</Text>
+    </View>
+  );
+
+  const EducationCard = ({ education }: { education: Education }) => (
+    <View style={styles.detailCard}>
+      <Ionicons name="school" size={16} color="#666" />
+      <View style={styles.detailCardContent}>
+        <Text style={styles.detailCardTitle}>{education.school_name}</Text>
+        {(education.degree || education.major) && (
+          <Text style={styles.detailCardSubtitle}>
+            {[education.degree, education.major].filter(Boolean).join(' in ')}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+
+  const ExperienceCard = ({ experience }: { experience: WorkExperience }) => (
+    <View style={styles.detailCard}>
+      <Ionicons name="briefcase" size={16} color="#666" />
+      <View style={styles.detailCardContent}>
+        <Text style={styles.detailCardTitle}>{experience.position}</Text>
+        <Text style={styles.detailCardSubtitle}>{experience.company}</Text>
+        {(experience.startDate || experience.endDate || experience.current) && (
+          <Text style={styles.detailCardDate}>
+            {formatDateRange(experience.startDate, experience.endDate, experience.current)}
+          </Text>
+        )}
+        {experience.description && (
+          <Text style={styles.detailCardDescription}>{experience.description}</Text>
+        )}
+      </View>
     </View>
   );
 
@@ -435,6 +500,43 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
       color: '#666',
       marginTop: 2,
     },
+
+    // New styles for detail cards
+    detailCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: '#f8f9fa',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      marginBottom: 8,
+    },
+    detailCardContent: {
+      marginLeft: 8,
+      flex: 1,
+    },
+    detailCardTitle: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: '#333',
+    },
+    detailCardSubtitle: {
+      fontSize: 12,
+      color: '#666',
+      marginTop: 2,
+    },
+    detailCardDate: {
+      fontSize: 11,
+      color: '#999',
+      marginTop: 4,
+      fontStyle: 'italic',
+    },
+    detailCardDescription: {
+      fontSize: 12,
+      color: '#666',
+      marginTop: 6,
+      lineHeight: 16,
+    },
   });
 
   const renderFrontSide = () => (
@@ -496,43 +598,74 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
           </View>
 
           {/* Education */}
-          {developer.education && (
+          {(developer.educationEntries?.length || developer.education) && (
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Education</Text>
-              <View style={styles.educationCard}>
-                <Ionicons name="school" size={16} color="#666" />
-                <View style={styles.educationDetails}>
-                  {developer.education.includes(',') ? (
-                    <>
-                      <Text style={styles.educationSchool}>
-                        {developer.education.split(',')[1].trim()}
-                      </Text>
+              {developer.educationEntries?.length ? (
+                <View style={styles.educationCard}>
+                  <Ionicons name="school" size={16} color="#666" />
+                  <View style={styles.educationDetails}>
+                    <Text style={styles.educationSchool}>
+                      {developer.educationEntries[0].school_name}
+                    </Text>
+                    {(developer.educationEntries[0].degree || developer.educationEntries[0].major) && (
                       <Text style={styles.educationText}>
-                        {developer.education.split(',')[0].trim()}
+                        {[developer.educationEntries[0].degree, developer.educationEntries[0].major].filter(Boolean).join(' in ')}
                       </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.educationText}>{developer.education}</Text>
-                  )}
+                    )}
+                  </View>
                 </View>
-              </View>
+              ) : developer.education ? (
+                <View style={styles.educationCard}>
+                  <Ionicons name="school" size={16} color="#666" />
+                  <View style={styles.educationDetails}>
+                    {developer.education.includes(',') ? (
+                      <>
+                        <Text style={styles.educationSchool}>
+                          {developer.education.split(',')[1].trim()}
+                        </Text>
+                        <Text style={styles.educationText}>
+                          {developer.education.split(',')[0].trim()}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={styles.educationText}>{developer.education}</Text>
+                    )}
+                  </View>
+                </View>
+              ) : null}
             </View>
           )}
 
           {/* Work Experience */}
-          {developer.company && (
+          {(developer.workExperiences?.length || developer.company) && (
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Experience</Text>
-              <View style={styles.workExperienceCard}>
-                <Ionicons name="briefcase" size={16} color="#666" />
-                <View style={styles.workExperienceDetails}>
-                  <Text style={styles.workExperienceCompany}>{developer.company}</Text>
-                  <Text style={styles.workExperienceRole}>
-                    {developer.position || developer.role}
-                    {developer.experience && `, ${developer.experience} year${developer.experience !== 1 ? 's' : ''}`}
-                  </Text>
+              {developer.workExperiences?.length ? (
+                <View style={styles.workExperienceCard}>
+                  <Ionicons name="briefcase" size={16} color="#666" />
+                  <View style={styles.workExperienceDetails}>
+                    <Text style={styles.workExperienceCompany}>{developer.workExperiences[0].company}</Text>
+                    <Text style={styles.workExperienceRole}>
+                      {developer.workExperiences[0].position}
+                      {developer.workExperiences[0].startDate && (
+                        `, ${formatDateRange(developer.workExperiences[0].startDate, developer.workExperiences[0].endDate, developer.workExperiences[0].current)}`
+                      )}
+                    </Text>
+                  </View>
                 </View>
-              </View>
+              ) : developer.company ? (
+                <View style={styles.workExperienceCard}>
+                  <Ionicons name="briefcase" size={16} color="#666" />
+                  <View style={styles.workExperienceDetails}>
+                    <Text style={styles.workExperienceCompany}>{developer.company}</Text>
+                    <Text style={styles.workExperienceRole}>
+                      {developer.position || developer.role}
+                      {developer.experience && `, ${developer.experience} year${developer.experience !== 1 ? 's' : ''}`}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
             </View>
           )}
 
@@ -565,6 +698,14 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* About Me Section */}
+          {developer.bio && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>About Me</Text>
+              <Text style={styles.bioText}>{developer.bio}</Text>
+            </View>
+          )}
+
           {/* All Skills */}
           {developer.skills.length > 0 && (
             <View style={styles.sectionContainer}>
@@ -577,44 +718,56 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
             </View>
           )}
 
-          {/* Education */}
-          {developer.education && (
+          {/* Education - Use rich data if available, fallback to simple */}
+          {(developer.educationEntries?.length || developer.education) && (
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Education</Text>
-              <View style={styles.educationCard}>
-                <Ionicons name="school" size={16} color="#666" />
-                <View style={styles.educationDetails}>
-                  {developer.education.includes(',') ? (
-                    <>
-                      <Text style={styles.educationSchool}>
-                        {developer.education.split(',')[1].trim()}
-                      </Text>
-                      <Text style={styles.educationText}>
-                        {developer.education.split(',')[0].trim()}
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.educationText}>{developer.education}</Text>
-                  )}
+              {developer.educationEntries?.length ? (
+                developer.educationEntries.map((edu, index) => (
+                  <EducationCard key={index} education={edu} />
+                ))
+              ) : developer.education ? (
+                <View style={styles.educationCard}>
+                  <Ionicons name="school" size={16} color="#666" />
+                  <View style={styles.educationDetails}>
+                    {developer.education.includes(',') ? (
+                      <>
+                        <Text style={styles.educationSchool}>
+                          {developer.education.split(',')[1].trim()}
+                        </Text>
+                        <Text style={styles.educationText}>
+                          {developer.education.split(',')[0].trim()}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={styles.educationText}>{developer.education}</Text>
+                    )}
+                  </View>
                 </View>
-              </View>
+              ) : null}
             </View>
           )}
 
-          {/* Work Experience */}
-          {developer.company && (
+          {/* Work Experience - Use rich data if available, fallback to simple */}
+          {(developer.workExperiences?.length || developer.company) && (
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Experience</Text>
-              <View style={styles.workExperienceCard}>
-                <Ionicons name="briefcase" size={16} color="#666" />
-                <View style={styles.workExperienceDetails}>
-                  <Text style={styles.workExperienceCompany}>{developer.company}</Text>
-                  <Text style={styles.workExperienceRole}>
-                    {developer.position || developer.role}
-                    {developer.experience && `, ${developer.experience} year${developer.experience !== 1 ? 's' : ''}`}
-                  </Text>
+              {developer.workExperiences?.length ? (
+                developer.workExperiences.map((exp, index) => (
+                  <ExperienceCard key={index} experience={exp} />
+                ))
+              ) : developer.company ? (
+                <View style={styles.workExperienceCard}>
+                  <Ionicons name="briefcase" size={16} color="#666" />
+                  <View style={styles.workExperienceDetails}>
+                    <Text style={styles.workExperienceCompany}>{developer.company}</Text>
+                    <Text style={styles.workExperienceRole}>
+                      {developer.position || developer.role}
+                      {developer.experience && `, ${developer.experience} year${developer.experience !== 1 ? 's' : ''}`}
+                    </Text>
+                  </View>
                 </View>
-              </View>
+              ) : null}
             </View>
           )}
 
