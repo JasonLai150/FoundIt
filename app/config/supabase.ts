@@ -36,6 +36,22 @@ export interface Database {
           profile_complete?: boolean
           created_at: string
           updated_at: string
+          // Goal-specific JSONB fields
+          company_name?: string
+          company_description?: string
+          firm_name?: string
+          firm_description?: string
+          desired_skills?: string[]
+          funding?: {
+            round?: string
+            amount?: string
+            investors?: string[]
+          }
+          investment_areas?: string[]
+          investment_amount?: {
+            min?: number
+            max?: number
+          }
         }
         Insert: {
           id: string
@@ -52,6 +68,22 @@ export interface Database {
           website?: string
           avatar_url?: string
           profile_complete?: boolean
+          // Goal-specific JSONB fields
+          company_name?: string
+          company_description?: string
+          firm_name?: string
+          firm_description?: string
+          desired_skills?: string[]
+          funding?: {
+            round?: string
+            amount?: string
+            investors?: string[]
+          }
+          investment_areas?: string[]
+          investment_amount?: {
+            min?: number
+            max?: number
+          }
         }
         Update: {
           id?: string
@@ -68,6 +100,22 @@ export interface Database {
           website?: string
           avatar_url?: string
           profile_complete?: boolean
+          // Goal-specific JSONB fields
+          company_name?: string
+          company_description?: string
+          firm_name?: string
+          firm_description?: string
+          desired_skills?: string[]
+          funding?: {
+            round?: string
+            amount?: string
+            investors?: string[]
+          }
+          investment_areas?: string[]
+          investment_amount?: {
+            min?: number
+            max?: number
+          }
         }
       }
       experience: {

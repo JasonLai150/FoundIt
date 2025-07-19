@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { RelativePathString, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -223,7 +223,7 @@ export default function SocialsSetup() {
         
         // Clear local cache only after successful submission
         await clearCache();
-        router.replace('/(tabs)/feed');
+        router.replace('/(tabs)/feed' as RelativePathString);
         
         // Show success message after navigation
         setTimeout(() => {
@@ -266,7 +266,7 @@ export default function SocialsSetup() {
         
         // Clear local cache when skipping
         await clearCache();
-        router.replace('/(tabs)/feed');
+        router.replace('/(tabs)/feed' as RelativePathString);
       }
     } catch (error) {
       console.error('Error skipping to complete:', error);
@@ -282,7 +282,7 @@ export default function SocialsSetup() {
       router.back();
     } else {
       // Fallback: navigate to profile page if no navigation history
-      router.replace('/(tabs)/profile');
+      router.replace('/(tabs)/profile' as RelativePathString);
     }
   };
 

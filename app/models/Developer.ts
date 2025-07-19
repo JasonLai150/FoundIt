@@ -40,6 +40,26 @@ export type Developer = {
   linkedin?: string;
   website?: string;
   looking: boolean; // Whether they're looking for collaborators
+  goal?: 'recruiting' | 'searching' | 'investing' | 'other'; // User's goal for profile card styling
+  
+  // Goal-specific fields for recruiters
+  companyName?: string;
+  companyDescription?: string;
+  desiredSkills?: string[];
+  funding?: {
+    round?: string;
+    amount?: string;
+    investors?: string[];
+  };
+  
+  // Goal-specific fields for investors
+  firmName?: string;
+  firmDescription?: string;
+  investmentAreas?: string[];
+  investmentAmount?: {
+    min?: number;
+    max?: number;
+  };
 };
 
 export const createDeveloper = (

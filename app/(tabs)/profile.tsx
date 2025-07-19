@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { RelativePathString, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Dimensions, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ProfileCard from '../components/ProfileCard';
@@ -23,7 +23,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       setTimeout(() => {
-        router.replace('/auth');
+        router.replace('/auth' as RelativePathString);
       }, 100);
     }
   }, [isAuthenticated, isLoading, router]);
@@ -123,7 +123,7 @@ export default function ProfileScreen() {
         <View style={styles.editProfileContainer}>
           <TouchableOpacity 
             style={styles.editProfileButton}
-            onPress={() => router.push('/profile-setup/edit-profile')}
+            onPress={() => router.push('/profile-setup/edit-profile' as RelativePathString)}
           >
             <Ionicons name="create-outline" size={20} color="#FF5864" />
             <Text style={styles.editProfileText}>Edit Profile</Text>

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { RelativePathString, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -217,7 +217,7 @@ export default function ProfessionalSetup() {
       router.back();
     } else {
       // Fallback: navigate to profile page if no navigation history
-      router.replace('/(tabs)/profile');
+      router.replace('/(tabs)/profile' as RelativePathString);
     }
   };
 

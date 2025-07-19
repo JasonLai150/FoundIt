@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { RelativePathString, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -50,6 +50,18 @@ export default function EditProfile() {
     state: '',
     role: '',
     goal: 'searching' as 'recruiting' | 'searching' | 'investing' | 'other',
+    // Goal-specific fields
+    companyName: '',
+    companyDescription: '',
+    desiredSkills: [] as string[],
+    fundingRound: '',
+    fundingAmount: '',
+    fundingInvestors: [] as string[],
+    firmName: '',
+    firmDescription: '',
+    investmentAreas: [] as string[],
+    investmentMin: '',
+    investmentMax: '',
   });
 
   const [professionalData, setProfessionalData] = useState({
@@ -71,9 +83,14 @@ export default function EditProfile() {
 
   const [newSkill, setNewSkill] = useState('');
 
+  // Tag input state variables for goal-specific fields
+  const [newDesiredSkill, setNewDesiredSkill] = useState('');
+  const [newFundingInvestor, setNewFundingInvestor] = useState('');
+  const [newInvestmentArea, setNewInvestmentArea] = useState('');
+
   // Re-sync all user data when userAsDeveloper changes
   useEffect(() => {
-    if (userAsDeveloper) {
+    if (userAsDeveloper && user) {
       // Update personal data from user object
       setPersonalData({
         first_name: user?.first_name || '',
@@ -84,7 +101,19 @@ export default function EditProfile() {
         city: userAsDeveloper.location ? userAsDeveloper.location.split(',')[0]?.trim() : '',
         state: userAsDeveloper.location ? userAsDeveloper.location.split(',')[1]?.trim() : '',
         role: userAsDeveloper.role || '',
-        goal: userAsDeveloper.looking ? 'searching' : 'other' as 'recruiting' | 'searching' | 'investing' | 'other',
+        goal: user?.goal || 'searching' as 'recruiting' | 'searching' | 'investing' | 'other',
+        // Goal-specific fields - safely handle undefined/null values
+        companyName: user?.company_name || '',
+        companyDescription: user?.company_description || '',
+        desiredSkills: Array.isArray(user?.desired_skills) ? user.desired_skills : [],
+        fundingRound: user?.funding?.round || '',
+        fundingAmount: user?.funding?.amount || '',
+        fundingInvestors: Array.isArray(user?.funding?.investors) ? user.funding.investors : [],
+        firmName: user?.firm_name || '',
+        firmDescription: user?.firm_description || '',
+        investmentAreas: Array.isArray(user?.investment_areas) ? user.investment_areas : [],
+        investmentMin: user?.investment_amount?.min?.toString() || '',
+        investmentMax: user?.investment_amount?.max?.toString() || '',
       });
 
       // Update professional data from Developer model
@@ -123,7 +152,7 @@ export default function EditProfile() {
       router.back();
     } else {
       // Fallback: navigate to profile page if no navigation history
-      router.replace('/(tabs)/profile');
+      router.replace('/(tabs)/profile' as RelativePathString);
     }
   };
 
@@ -183,6 +212,22 @@ export default function EditProfile() {
         location: location,
         role: personalData.role.trim() || undefined,
         goal: personalData.goal,
+        // Goal-specific JSONB fields
+        company_name: personalData.companyName?.trim() || undefined,
+        company_description: personalData.companyDescription?.trim() || undefined,
+        desired_skills: personalData.desiredSkills && personalData.desiredSkills.length > 0 ? personalData.desiredSkills : undefined,
+        funding: (personalData.fundingRound || personalData.fundingAmount || (personalData.fundingInvestors && personalData.fundingInvestors.length > 0)) ? {
+          round: personalData.fundingRound || undefined,
+          amount: personalData.fundingAmount || undefined,
+          investors: (personalData.fundingInvestors && personalData.fundingInvestors.length > 0) ? personalData.fundingInvestors : undefined,
+        } : undefined,
+        firm_name: personalData.firmName?.trim() || undefined,
+        firm_description: personalData.firmDescription?.trim() || undefined,
+        investment_areas: personalData.investmentAreas && personalData.investmentAreas.length > 0 ? personalData.investmentAreas : undefined,
+        investment_amount: (personalData.investmentMin || personalData.investmentMax) ? {
+          min: personalData.investmentMin ? parseInt(personalData.investmentMin) : undefined,
+          max: personalData.investmentMax ? parseInt(personalData.investmentMax) : undefined,
+        } : undefined,
       };
 
       const success = await updateUserProfile(updateData);
@@ -341,6 +386,75 @@ export default function EditProfile() {
       ...professionalData,
       skills: professionalData.skills.filter((skill: string) => skill !== skillToRemove)
     });
+  };
+
+  // Goal-specific tag management functions
+  const addDesiredSkill = () => {
+    if (newDesiredSkill.trim() && !personalData.desiredSkills?.includes(newDesiredSkill.trim())) {
+      setPersonalData({
+        ...personalData,
+        desiredSkills: [...(personalData.desiredSkills || []), newDesiredSkill.trim()]
+      });
+      setNewDesiredSkill('');
+    }
+  };
+
+  const removeDesiredSkill = (skillToRemove: string) => {
+    setPersonalData({
+      ...personalData,
+      desiredSkills: personalData.desiredSkills?.filter(skill => skill !== skillToRemove) || []
+    });
+  };
+
+  const addFundingInvestor = () => {
+    if (newFundingInvestor.trim() && !personalData.fundingInvestors?.includes(newFundingInvestor.trim())) {
+      setPersonalData({
+        ...personalData,
+        fundingInvestors: [...(personalData.fundingInvestors || []), newFundingInvestor.trim()]
+      });
+      setNewFundingInvestor('');
+    }
+  };
+
+  const removeFundingInvestor = (investorToRemove: string) => {
+    setPersonalData({
+      ...personalData,
+      fundingInvestors: personalData.fundingInvestors?.filter(investor => investor !== investorToRemove) || []
+    });
+  };
+
+  const addInvestmentArea = () => {
+    if (newInvestmentArea.trim() && !personalData.investmentAreas?.includes(newInvestmentArea.trim())) {
+      setPersonalData({
+        ...personalData,
+        investmentAreas: [...(personalData.investmentAreas || []), newInvestmentArea.trim()]
+      });
+      setNewInvestmentArea('');
+    }
+  };
+
+  const removeInvestmentArea = (areaToRemove: string) => {
+    setPersonalData({
+      ...personalData,
+      investmentAreas: personalData.investmentAreas?.filter(area => area !== areaToRemove) || []
+    });
+  };
+
+  // Utility function for currency formatting
+  const formatCurrency = (amount: string): string => {
+    if (!amount) return amount;
+    
+    const numericAmount = amount.replace(/[^0-9]/g, '');
+    if (!numericAmount) return amount;
+    
+    const num = parseInt(numericAmount);
+    if (num >= 1000000) {
+      return `$${(num / 1000000).toFixed(num % 1000000 === 0 ? 0 : 1)}M`;
+    } else if (num >= 1000) {
+      return `$${(num / 1000).toFixed(num % 1000 === 0 ? 0 : 1)}K`;
+    } else {
+      return `$${num.toLocaleString()}`;
+    }
   };
 
   const addEducation = () => {
@@ -532,6 +646,193 @@ export default function EditProfile() {
             </View>
           </View>
 
+          {/* Goal-specific fields - Recruiting */}
+          {personalData.goal === 'recruiting' && (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Company/Startup Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={personalData.companyName || ''}
+                  onChangeText={(text) => setPersonalData({ ...personalData, companyName: text })}
+                  placeholder="Acme Corp / My Startup"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Company Description</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={personalData.companyDescription || ''}
+                  onChangeText={(text) => setPersonalData({ ...personalData, companyDescription: text })}
+                  placeholder="Brief description of your company..."
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Desired Skills</Text>
+                <Text style={styles.characterCount}>Skills you're looking for in candidates</Text>
+                <View style={styles.skillsContainer}>
+                  {(personalData.desiredSkills || []).map((skill, index) => (
+                    <View key={index} style={styles.skillTag}>
+                      <Text style={styles.skillText}>{skill}</Text>
+                      <TouchableOpacity onPress={() => removeDesiredSkill(skill)} style={styles.skillRemove}>
+                        <Text style={styles.skillRemoveText}>×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.skillInputContainer}>
+                  <TextInput
+                    style={styles.skillInput}
+                    value={newDesiredSkill}
+                    onChangeText={setNewDesiredSkill}
+                    placeholder="Add a desired skill"
+                    onSubmitEditing={addDesiredSkill}
+                    returnKeyType="done"
+                  />
+                  <TouchableOpacity onPress={addDesiredSkill} style={styles.addSkillButton}>
+                    <Text style={styles.addButtonText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Funding Round</Text>
+                <TextInput
+                  style={styles.input}
+                  value={personalData.fundingRound || ''}
+                  onChangeText={(text) => setPersonalData({ ...personalData, fundingRound: text })}
+                  placeholder="Seed / Series A / Series B / etc."
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Funding Amount</Text>
+                <TextInput
+                  style={styles.input}
+                  value={personalData.fundingAmount || ''}
+                  onChangeText={(text) => setPersonalData({ ...personalData, fundingAmount: text })}
+                  placeholder="$500K / $1M / $5M"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Notable Investors</Text>
+                <Text style={styles.characterCount}>Key investors or VCs backing your company</Text>
+                <View style={styles.skillsContainer}>
+                  {(personalData.fundingInvestors || []).map((investor, index) => (
+                    <View key={index} style={styles.skillTag}>
+                      <Text style={styles.skillText}>{investor}</Text>
+                      <TouchableOpacity onPress={() => removeFundingInvestor(investor)} style={styles.skillRemove}>
+                        <Text style={styles.skillRemoveText}>×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.skillInputContainer}>
+                  <TextInput
+                    style={styles.skillInput}
+                    value={newFundingInvestor}
+                    onChangeText={setNewFundingInvestor}
+                    placeholder="Add an investor"
+                    onSubmitEditing={addFundingInvestor}
+                    returnKeyType="done"
+                  />
+                  <TouchableOpacity onPress={addFundingInvestor} style={styles.addSkillButton}>
+                    <Text style={styles.addButtonText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
+          )}
+
+          {/* Goal-specific fields - Investing */}
+          {personalData.goal === 'investing' && (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Investment Firm Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={personalData.firmName || ''}
+                  onChangeText={(text) => setPersonalData({ ...personalData, firmName: text })}
+                  placeholder="Venture Capital Partners"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Firm Description</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={personalData.firmDescription || ''}
+                  onChangeText={(text) => setPersonalData({ ...personalData, firmDescription: text })}
+                  placeholder="Brief description of your investment firm..."
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Investment Areas</Text>
+                <Text style={styles.characterCount}>Sectors or industries you invest in</Text>
+                <View style={styles.skillsContainer}>
+                  {(personalData.investmentAreas || []).map((area, index) => (
+                    <View key={index} style={styles.skillTag}>
+                      <Text style={styles.skillText}>{area}</Text>
+                      <TouchableOpacity onPress={() => removeInvestmentArea(area)} style={styles.skillRemove}>
+                        <Text style={styles.skillRemoveText}>×</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.skillInputContainer}>
+                  <TextInput
+                    style={styles.skillInput}
+                    value={newInvestmentArea}
+                    onChangeText={setNewInvestmentArea}
+                    placeholder="Add an investment area"
+                    onSubmitEditing={addInvestmentArea}
+                    returnKeyType="done"
+                  />
+                  <TouchableOpacity onPress={addInvestmentArea} style={styles.addSkillButton}>
+                    <Text style={styles.addButtonText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Investment Range</Text>
+                <Text style={styles.characterCount}>Typical investment amount range</Text>
+                <View style={styles.dateRow}>
+                  <TextInput
+                    style={styles.dateInput}
+                    value={personalData.investmentMin || ''}
+                    onChangeText={(text) => setPersonalData({ ...personalData, investmentMin: text.replace(/[^0-9]/g, '') })}
+                    placeholder="Min (e.g., 100000)"
+                    keyboardType="numeric"
+                  />
+                  <Text style={styles.investmentSeparator}>to</Text>
+                  <TextInput
+                    style={styles.dateInput}
+                    value={personalData.investmentMax || ''}
+                    onChangeText={(text) => setPersonalData({ ...personalData, investmentMax: text.replace(/[^0-9]/g, '') })}
+                    placeholder="Max (e.g., 5000000)"
+                    keyboardType="numeric"
+                  />
+                </View>
+                {(personalData.investmentMin || personalData.investmentMax) && (
+                  <Text style={styles.characterCount}>
+                    Range: {personalData.investmentMin ? formatCurrency(personalData.investmentMin) : '$0'} - {personalData.investmentMax ? formatCurrency(personalData.investmentMax) : '∞'}
+                  </Text>
+                )}
+              </View>
+            </>
+          )}
+
           <TouchableOpacity
             style={[styles.saveButton, isLoading && styles.buttonDisabled]}
             onPress={handleSavePersonal}
@@ -578,6 +879,98 @@ export default function EditProfile() {
               {GOAL_OPTIONS.find(option => option.value === personalData.goal)?.title || 'Not specified'}
             </Text>
           </View>
+
+          {/* Goal-specific display fields - Recruiting */}
+          {personalData.goal === 'recruiting' && (
+            <>
+              {personalData.companyName && (
+                <View style={styles.displayItem}>
+                  <Text style={styles.displayLabel}>Company/Startup</Text>
+                  <Text style={styles.displayValue}>{personalData.companyName}</Text>
+                </View>
+              )}
+              {personalData.companyDescription && (
+                <View style={styles.displayItem}>
+                  <Text style={styles.displayLabel}>Company Description</Text>
+                  <Text style={styles.displayValue}>{personalData.companyDescription}</Text>
+                </View>
+              )}
+              {personalData.desiredSkills && personalData.desiredSkills.length > 0 && (
+                <View style={styles.displayItem}>
+                  <Text style={styles.displayLabel}>Desired Skills</Text>
+                  <View style={styles.displaySkillsContainer}>
+                    {personalData.desiredSkills.map((skill, index) => (
+                      <View key={index} style={styles.displaySkillTag}>
+                        <Text style={styles.displaySkillText}>{skill}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+              {personalData.fundingRound && (
+                <View style={styles.displayItem}>
+                  <Text style={styles.displayLabel}>Funding Round</Text>
+                  <Text style={styles.displayValue}>{personalData.fundingRound}</Text>
+                </View>
+              )}
+              {personalData.fundingAmount && (
+                <View style={styles.displayItem}>
+                  <Text style={styles.displayLabel}>Funding Amount</Text>
+                  <Text style={styles.displayValue}>{personalData.fundingAmount}</Text>
+                </View>
+              )}
+              {personalData.fundingInvestors && personalData.fundingInvestors.length > 0 && (
+                <View style={styles.displayItem}>
+                  <Text style={styles.displayLabel}>Notable Investors</Text>
+                  <View style={styles.displaySkillsContainer}>
+                    {personalData.fundingInvestors.map((investor, index) => (
+                      <View key={index} style={styles.displaySkillTag}>
+                        <Text style={styles.displaySkillText}>{investor}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+
+          {/* Goal-specific display fields - Investing */}
+          {personalData.goal === 'investing' && (
+            <>
+              {personalData.firmName && (
+                <View style={styles.displayItem}>
+                  <Text style={styles.displayLabel}>Investment Firm</Text>
+                  <Text style={styles.displayValue}>{personalData.firmName}</Text>
+                </View>
+              )}
+              {personalData.firmDescription && (
+                <View style={styles.displayItem}>
+                  <Text style={styles.displayLabel}>Firm Description</Text>
+                  <Text style={styles.displayValue}>{personalData.firmDescription}</Text>
+                </View>
+              )}
+              {personalData.investmentAreas && personalData.investmentAreas.length > 0 && (
+                <View style={styles.displayItem}>
+                  <Text style={styles.displayLabel}>Investment Areas</Text>
+                  <View style={styles.displaySkillsContainer}>
+                    {personalData.investmentAreas.map((area, index) => (
+                      <View key={index} style={styles.displaySkillTag}>
+                        <Text style={styles.displaySkillText}>{area}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+              {(personalData.investmentMin || personalData.investmentMax) && (
+                <View style={styles.displayItem}>
+                  <Text style={styles.displayLabel}>Investment Range</Text>
+                  <Text style={styles.displayValue}>
+                    {personalData.investmentMin ? formatCurrency(personalData.investmentMin) : '$0'} - {personalData.investmentMax ? formatCurrency(personalData.investmentMax) : '∞'}
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
         </View>
       )}
     </View>
@@ -1480,5 +1873,15 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: '#FF5864',
     fontSize: 16,
+  },
+  investmentSeparator: {
+    marginHorizontal: 8,
+    color: '#333',
+    fontSize: 16,
+  },
+  skillRemoveText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 }); 

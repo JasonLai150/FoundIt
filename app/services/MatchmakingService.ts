@@ -157,6 +157,14 @@ class MatchmakingService {
           linkedin,
           website,
           avatar_url,
+          company_name,
+          company_description,
+          firm_name,
+          firm_description,
+          desired_skills,
+          funding,
+          investment_areas,
+          investment_amount,
           experience:experience(*)
         `)
         .neq('id', currentUserId) // Exclude current user
@@ -290,7 +298,20 @@ class MatchmakingService {
         linkedin: profile.linkedin,
         website: profile.website,
         looking: profile.goal === 'searching', // Developers are "looking"
-        experience: this.calculateExperience(workExperience)
+        goal: profile.goal,
+        experience: this.calculateExperience(workExperience),
+        
+        // Goal-specific fields for recruiters
+        companyName: profile.company_name,
+        companyDescription: profile.company_description,
+        desiredSkills: profile.desired_skills,
+        funding: profile.funding,
+        
+        // Goal-specific fields for investors
+        firmName: profile.firm_name,
+        firmDescription: profile.firm_description,
+        investmentAreas: profile.investment_areas,
+        investmentAmount: profile.investment_amount,
       };
     });
   }

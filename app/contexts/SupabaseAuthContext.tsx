@@ -21,6 +21,22 @@ interface User {
   created_at?: string;
   updated_at?: string;
   profile_complete?: boolean; // Track if user has completed profile setup
+  // Goal-specific JSONB fields
+  company_name?: string;
+  company_description?: string;
+  firm_name?: string;
+  firm_description?: string;
+  desired_skills?: string[];
+  funding?: {
+    round?: string;
+    amount?: string;
+    investors?: string[];
+  };
+  investment_areas?: string[];
+  investment_amount?: {
+    min?: number;
+    max?: number;
+  };
 }
 
 interface Experience {
@@ -151,6 +167,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
+        // Handle specific case where profile doesn't exist (PGRST116)
+        if (error.code === 'PGRST116' || error.message?.includes('0 rows')) {
+          console.log('No profile found for authenticated user, clearing auth state');
+          
+          // Clear local auth state
+          setUser(null);
+          setIsAuthenticated(false);
+          setSupabaseUser(null);
+          setSession(null);
+          
+          // Sign out from Supabase (but don't show alert)
+          try {
+            await supabase.auth.signOut();
+          } catch (signOutError) {
+            console.error('Error signing out:', signOutError);
+          }
+          
+          // Clear stay logged in preference
+          try {
+            await AsyncStorage.removeItem('stayLoggedIn');
+            setShouldAutoLogin(false);
+          } catch (storageError) {
+            console.error('Error clearing storage:', storageError);
+          }
+          
+          return;
+        }
+        
         console.error('Error fetching user data:', error);
         return;
       }
@@ -173,7 +217,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           created_at: data.created_at,
           updated_at: data.updated_at,
           profile_complete: data.profile_complete,
+          // Goal-specific JSONB fields - handle null/undefined properly
+          company_name: data.company_name || undefined,
+          company_description: data.company_description || undefined,
+          firm_name: data.firm_name || undefined,
+          firm_description: data.firm_description || undefined,
+          desired_skills: Array.isArray(data.desired_skills) ? data.desired_skills : undefined,
+          funding: data.funding && typeof data.funding === 'object' ? data.funding : undefined,
+          investment_areas: Array.isArray(data.investment_areas) ? data.investment_areas : undefined,
+          investment_amount: data.investment_amount && typeof data.investment_amount === 'object' ? data.investment_amount : undefined,
         };
+        
         setUser(userData);
         
         // Automatically fetch and cache experience data for immediate use
@@ -181,13 +235,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const experienceData = await fetchUserExperience(userId);
           // Note: We can't directly call updateProfileCache here due to circular dependency
           // The cache will be populated when components load and check for valid cache
-          console.log('Experience data fetched for cache:', experienceData ? 'Available' : 'None');
         } catch (expError) {
           console.error('Error fetching experience data during login:', expError);
         }
       }
     } catch (error) {
       console.error('Exception in fetchUserData:', error);
+      
+      // For any unexpected errors, also clear auth state
+      setUser(null);
+      setIsAuthenticated(false);
+      setSupabaseUser(null);
+      setSession(null);
     }
   };
 
@@ -277,28 +336,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.session) {
         // Create profile manually since no trigger exists
         try {
-          const { error: profileError } = await supabase
+          const profileData = {
+            id: data.user.id,
+            email: data.user.email!,
+            profile_complete: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          
+          const { data: profileResult, error: profileError } = await supabase
             .from('profiles')
-            .upsert({
-              id: data.user.id,
-              email: data.user.email!,
-              profile_complete: false,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            }, {
+            .upsert(profileData, {
               onConflict: 'id',
               ignoreDuplicates: false
-            });
+            })
+            .select()
+            .single();
           
           if (profileError) {
             console.error('Profile creation failed:', profileError);
             throw profileError;
           }
+          
+          if (!profileResult) {
+            throw new Error('Profile creation failed - no data returned');
+          }
+          
         } catch (profileError) {
           console.error('Failed to create profile:', profileError);
+          
+          // Try to clean up the auth user if profile creation failed
+          try {
+            await supabase.auth.signOut();
+          } catch (cleanupError) {
+            console.error('Failed to cleanup auth after profile creation error:', cleanupError);
+          }
+          
           showAlert(
             '⚠️ Profile Creation Failed',
-            'Your account was created but we couldn\'t set up your profile. Please try logging in again.',
+            'Your account was created but we couldn\'t set up your profile. Please try logging in again or contact support.',
             [{ text: 'OK', style: 'default' }]
           );
           return false;
@@ -306,12 +382,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         await AsyncStorage.setItem('stayLoggedIn', stayLoggedIn.toString());
         setShouldAutoLogin(stayLoggedIn);
-
-        showAlert(
-          '🎉 Welcome to FoundIt!', 
-          'Your account has been created and you\'re now logged in!',
-          [{ text: 'Get Started', style: 'default' }]
-        );
       }
 
       return true;
@@ -383,8 +453,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateUserProfile = async (userData: Partial<User>): Promise<boolean> => {
+    try {
       if (!supabaseUser || !session) {
-      console.error('Missing authentication for profile update');
+        console.error('Missing authentication for profile update');
         return false;
       }
       
@@ -395,17 +466,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .select();
       
       if (error) {
-      console.error('Database update error:', error);
+        console.error('Database update error:', error);
         throw error;
       }
       
       if (!data || data.length === 0) {
-      console.error('No rows updated - profile may not exist');
-      throw new Error('Profile not found');
+        console.error('No rows updated - profile may not exist');
+        throw new Error('Profile not found');
       }
       
       setUser(data[0] as User);
       return true;
+    } catch (error) {
+      console.error('Exception in updateUserProfile:', error);
+      throw error;
+    }
   };
 
   const createUserExperience = async (experienceData: Omit<Experience, 'id' | 'created_at'>): Promise<boolean> => {

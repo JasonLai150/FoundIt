@@ -57,6 +57,58 @@ const getRoleGradient = (role: string): [string, string] => {
   }
 };
 
+// Goal-specific colors for borders and backgrounds
+const getGoalColors = (goal?: string) => {
+  switch (goal) {
+    case 'investing':
+      return { border: '#10B981', background: '#10B981' }; // Dark emerald green
+    case 'searching':
+      return { border: '#0EA5E9', background: '#0EA5E9' }; // Sky blue
+    case 'recruiting':
+      return { border: '#F97316', background: '#F97316' }; // Fiery red-orange
+    case 'other':
+    default:
+      return { border: '#A855F7', background: '#A855F7' }; // Light purple
+  }
+};
+
+// Goal-specific gradients for profile backgrounds
+const getGoalGradient = (goal?: string): [string, string] => {
+  switch (goal) {
+    case 'investing':
+      return ['#10B981', '#059669']; // Emerald green gradient
+    case 'searching':
+      return ['#0EA5E9', '#0284C7']; // Sky blue gradient
+    case 'recruiting':
+      return ['#F97316', '#EA580C']; // Orange gradient
+    case 'other':
+    default:
+      return ['#A855F7', '#9333EA']; // Purple gradient
+  }
+};
+
+// Role-based colors for profile picture rings
+const getRoleRingColor = (role: string): string => {
+  const roleKey = role.toLowerCase();
+  if (roleKey.includes('frontend') || roleKey.includes('ui') || roleKey.includes('ux')) {
+    return '#667eea';
+  } else if (roleKey.includes('backend') || roleKey.includes('server') || roleKey.includes('api')) {
+    return '#f5576c';
+  } else if (roleKey.includes('fullstack') || roleKey.includes('full-stack') || roleKey.includes('full stack')) {
+    return '#00f2fe';
+  } else if (roleKey.includes('mobile') || roleKey.includes('ios') || roleKey.includes('android')) {
+    return '#38f9d7';
+  } else if (roleKey.includes('devops') || roleKey.includes('sre') || roleKey.includes('infrastructure')) {
+    return '#fee140';
+  } else if (roleKey.includes('data') || roleKey.includes('scientist') || roleKey.includes('analyst')) {
+    return '#fed6e3';
+  } else if (roleKey.includes('security') || roleKey.includes('cyber')) {
+    return '#fecfef';
+  } else {
+    return 'rgba(255, 255, 255, 0.9)'; // Default white
+  }
+};
+
 interface ProfileCardProps {
   developer: Developer;
 }
@@ -73,7 +125,8 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
   const [frontScrollKey] = useState(() => `front-scroll-${Math.random()}`);
   const [backScrollKey] = useState(() => `back-scroll-${Math.random()}`);
 
-  const gradientColors = getRoleGradient(developer.role);
+  const gradientColors = getGoalGradient(developer.goal);
+  const goalColors = getGoalColors(developer.goal);
 
   const flipCard = () => {
     const toValue = isFlipped ? 0 : 1;
@@ -102,6 +155,38 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
       const formattedUrl = url.startsWith('http') ? url : `https://${url}`;
       Linking.openURL(formattedUrl);
     }
+  };
+
+  // Utility function for currency formatting
+  const formatCurrency = (amount: string): string => {
+    if (!amount) return amount;
+    
+    const numericAmount = amount.replace(/[^0-9]/g, '');
+    if (!numericAmount) return amount;
+    
+    const num = parseInt(numericAmount);
+    if (num >= 1000000) {
+      return `$${(num / 1000000).toFixed(num % 1000000 === 0 ? 0 : 1)}M`;
+    } else if (num >= 1000) {
+      return `$${(num / 1000).toFixed(num % 1000 === 0 ? 0 : 1)}K`;
+    } else {
+      return `$${num.toLocaleString()}`;
+    }
+  };
+
+  // Format investment range
+  const formatInvestmentRange = (investmentAmount?: { min?: number; max?: number }): string => {
+    if (!investmentAmount) return '';
+    
+    const { min, max } = investmentAmount;
+    if (min && max) {
+      return `$${min >= 1000000 ? (min / 1000000).toFixed(min % 1000000 === 0 ? 0 : 1) + 'M' : min >= 1000 ? (min / 1000).toFixed(min % 1000 === 0 ? 0 : 1) + 'K' : min.toLocaleString()} - $${max >= 1000000 ? (max / 1000000).toFixed(max % 1000000 === 0 ? 0 : 1) + 'M' : max >= 1000 ? (max / 1000).toFixed(max % 1000 === 0 ? 0 : 1) + 'K' : max.toLocaleString()}`;
+    } else if (min) {
+      return `$${min >= 1000000 ? (min / 1000000).toFixed(min % 1000000 === 0 ? 0 : 1) + 'M+' : min >= 1000 ? (min / 1000).toFixed(min % 1000 === 0 ? 0 : 1) + 'K+' : min.toLocaleString() + '+'}`;
+    } else if (max) {
+      return `Up to $${max >= 1000000 ? (max / 1000000).toFixed(max % 1000000 === 0 ? 0 : 1) + 'M' : max >= 1000 ? (max / 1000).toFixed(max % 1000 === 0 ? 0 : 1) + 'K' : max.toLocaleString()}`;
+    }
+    return '';
   };
 
   const formatDate = (dateString: string | undefined): string => {
@@ -193,6 +278,8 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
       borderRadius: 20,
       overflow: 'hidden',
       backgroundColor: 'white',
+      borderWidth: 6, // Thick border
+      borderColor: goalColors.border,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 10 },
       shadowOpacity: 0.15,
@@ -224,7 +311,7 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
     decorativeCircle: {
       position: 'absolute',
       borderRadius: 50,
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      backgroundColor: 'rgba(200, 200, 200, 0.1)',
     },
     decorativeCircle1: {
       width: 100,
@@ -254,7 +341,7 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
       height: 100,
       borderRadius: 50,
       borderWidth: 4,
-      borderColor: 'rgba(255, 255, 255, 0.9)',
+      borderColor: 'white', // Changed from roleRingColor
     },
     placeholderProfileImage: {
       width: 100,
@@ -264,7 +351,7 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 4,
-      borderColor: 'rgba(255, 255, 255, 0.9)',
+      borderColor: 'white', // Changed from roleRingColor
     },
     profileImageBorder: {
       position: 'absolute',
@@ -274,7 +361,7 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
       bottom: -8,
       borderRadius: 58,
       borderWidth: 2,
-      borderColor: 'rgba(255, 255, 255, 0.3)',
+      borderColor: 'white', // Changed from roleRingColor
     },
     profileName: {
       fontSize: 24,
@@ -548,6 +635,54 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
       marginTop: 6,
       lineHeight: 16,
     },
+    
+    // Recruiter/Investor specific styles
+    companyCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: '#f8f9fa',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+    },
+    companyDetails: {
+      marginLeft: 8,
+      flex: 1,
+    },
+    companyName: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: '#333',
+    },
+    companyDescription: {
+      fontSize: 12,
+      color: '#666',
+      marginTop: 2,
+      lineHeight: 16,
+    },
+    fundingCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#f8f9fa',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+    },
+    fundingDetails: {
+      marginLeft: 8,
+      flex: 1,
+    },
+    fundingText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#333',
+    },
+    fundingAmount: {
+      fontSize: 13,
+      color: '#007AFF',
+      fontWeight: '600',
+      marginTop: 2,
+    },
   });
 
   const renderFrontSide = () => (
@@ -600,94 +735,211 @@ export default function ProfileCard({ developer }: ProfileCardProps) {
           removeClippedSubviews={false}
           maintainVisibleContentPosition={null}
         >
-          {/* About Section */}
-          {developer.bio && (
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>About</Text>
-              <Text style={styles.bioText} numberOfLines={2} ellipsizeMode="tail">{developer.bio}</Text>
-            </View>
-          )}
-
-          {/* Top Skills */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Top Skills</Text>
-            <View style={styles.topSkillsContainer}>
-              {developer.skills.slice(0, 3).map((skill, index) => (
-                <SkillBadge key={index} skill={skill} isTopSkill={true} />
-              ))}
-            </View>
-          </View>
-
-          {/* Education */}
-          {(developer.educationEntries?.length || developer.education) && (
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Education</Text>
-              {developer.educationEntries?.length ? (
-                <View style={styles.educationCard}>
-                  <Ionicons name="school" size={16} color="#666" />
-                  <View style={styles.educationDetails}>
-                    <Text style={styles.educationSchool}>
-                      {developer.educationEntries[0].school_name}
-                    </Text>
-                    {(developer.educationEntries[0].degree || developer.educationEntries[0].major) && (
-                      <Text style={styles.educationText}>
-                        {[developer.educationEntries[0].degree, developer.educationEntries[0].major].filter(Boolean).join(' in ')}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              ) : developer.education ? (
-                <View style={styles.educationCard}>
-                  <Ionicons name="school" size={16} color="#666" />
-                  <View style={styles.educationDetails}>
-                    {developer.education.includes(',') ? (
-                      <>
-                        <Text style={styles.educationSchool}>
-                          {developer.education.split(',')[1].trim()}
+          {/* Conditional content based on goal */}
+          {developer.goal === 'recruiting' ? (
+            // Recruiter-specific content
+            <>
+              {/* Company Section */}
+              {developer.companyName && (
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Company</Text>
+                  <View style={styles.companyCard}>
+                    <Ionicons name="business" size={16} color="#666" />
+                    <View style={styles.companyDetails}>
+                      <Text style={styles.companyName}>{developer.companyName}</Text>
+                      {developer.companyDescription && (
+                        <Text style={styles.companyDescription} numberOfLines={2} ellipsizeMode="tail">
+                          {developer.companyDescription}
                         </Text>
-                        <Text style={styles.educationText}>
-                          {developer.education.split(',')[0].trim()}
-                        </Text>
-                      </>
-                    ) : (
-                      <Text style={styles.educationText}>{developer.education}</Text>
-                    )}
-                  </View>
-                </View>
-              ) : null}
-            </View>
-          )}
-
-          {/* Work Experience */}
-          {(developer.workExperiences?.length || developer.company) && (
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Experience</Text>
-              {developer.workExperiences?.length ? (
-                <View style={styles.workExperienceCard}>
-                  <Ionicons name="briefcase" size={16} color="#666" />
-                  <View style={styles.workExperienceDetails}>
-                    <Text style={styles.workExperienceCompany}>{developer.workExperiences[0].company}</Text>
-                    <Text style={styles.workExperienceRole}>
-                      {developer.workExperiences[0].position}
-                      {developer.workExperiences[0].startDate && (
-                        `, ${formatDateRange(developer.workExperiences[0].startDate, developer.workExperiences[0].endDate, developer.workExperiences[0].current)}`
                       )}
-                    </Text>
+                    </View>
                   </View>
                 </View>
-              ) : developer.company ? (
-                <View style={styles.workExperienceCard}>
-                  <Ionicons name="briefcase" size={16} color="#666" />
-                  <View style={styles.workExperienceDetails}>
-                    <Text style={styles.workExperienceCompany}>{developer.company}</Text>
-                    <Text style={styles.workExperienceRole}>
-                      {developer.position || developer.role}
-                      {developer.experience && `, ${developer.experience} year${developer.experience !== 1 ? 's' : ''}`}
-                    </Text>
+              )}
+
+              {/* Looking for Skills */}
+              {developer.desiredSkills && developer.desiredSkills.length > 0 && (
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Looking for</Text>
+                  <View style={styles.topSkillsContainer}>
+                    {developer.desiredSkills.slice(0, 5).map((skill, index) => (
+                      <View key={index} style={styles.skillBadge}>
+                        <Text style={styles.skillText}>{skill}</Text>
+                      </View>
+                    ))}
+                    {developer.desiredSkills.length > 5 && (
+                      <View style={styles.skillBadge}>
+                        <Text style={styles.skillText}>+{developer.desiredSkills.length - 5} more</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
-              ) : null}
-            </View>
+              )}
+
+              {/* Funding Info */}
+              {developer.funding && (developer.funding.round || developer.funding.amount) && (
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Funding</Text>
+                  <View style={styles.fundingCard}>
+                    <Ionicons name="trending-up" size={16} color="#666" />
+                    <View style={styles.fundingDetails}>
+                      {developer.funding.round && (
+                        <Text style={styles.fundingText}>{developer.funding.round}</Text>
+                      )}
+                      {developer.funding.amount && (
+                        <Text style={styles.fundingAmount}>{formatCurrency(developer.funding.amount)}</Text>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              )}
+            </>
+          ) : developer.goal === 'investing' ? (
+            // Investor-specific content
+            <>
+              {/* Investment Firm */}
+              {developer.firmName && (
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Investment Firm</Text>
+                  <View style={styles.companyCard}>
+                    <Ionicons name="business" size={16} color="#666" />
+                    <View style={styles.companyDetails}>
+                      <Text style={styles.companyName}>{developer.firmName}</Text>
+                      {developer.firmDescription && (
+                        <Text style={styles.companyDescription} numberOfLines={2} ellipsizeMode="tail">
+                          {developer.firmDescription}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Investment Areas */}
+              {developer.investmentAreas && developer.investmentAreas.length > 0 && (
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Investment Areas</Text>
+                  <View style={styles.topSkillsContainer}>
+                    {developer.investmentAreas.slice(0, 3).map((area, index) => (
+                      <View key={index} style={styles.skillBadge}>
+                        <Text style={styles.skillText}>{area}</Text>
+                      </View>
+                    ))}
+                    {developer.investmentAreas.length > 3 && (
+                      <View style={styles.skillBadge}>
+                        <Text style={styles.skillText}>+{developer.investmentAreas.length - 3} more</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* Investment Range */}
+              {developer.investmentAmount && (developer.investmentAmount.min || developer.investmentAmount.max) && (
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Investment Range</Text>
+                  <View style={styles.fundingCard}>
+                    <Ionicons name="cash" size={16} color="#666" />
+                    <View style={styles.fundingDetails}>
+                      <Text style={styles.fundingAmount}>{formatInvestmentRange(developer.investmentAmount)}</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </>
+          ) : (
+            // Default content for developers and others
+            <>
+              {/* About Section */}
+              {developer.bio && (
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>About</Text>
+                  <Text style={styles.bioText} numberOfLines={2} ellipsizeMode="tail">{developer.bio}</Text>
+                </View>
+              )}
+
+              {/* Top Skills */}
+              <View style={styles.sectionContainer}>
+                <Text style={styles.sectionTitle}>Top Skills</Text>
+                <View style={styles.topSkillsContainer}>
+                  {developer.skills.slice(0, 3).map((skill, index) => (
+                    <SkillBadge key={index} skill={skill} isTopSkill={true} />
+                  ))}
+                </View>
+              </View>
+
+              {/* Education */}
+              {(developer.educationEntries?.length || developer.education) && (
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Education</Text>
+                  {developer.educationEntries?.length ? (
+                    <View style={styles.educationCard}>
+                      <Ionicons name="school" size={16} color="#666" />
+                      <View style={styles.educationDetails}>
+                        <Text style={styles.educationSchool}>
+                          {developer.educationEntries[0].school_name}
+                        </Text>
+                        {(developer.educationEntries[0].degree || developer.educationEntries[0].major) && (
+                          <Text style={styles.educationText}>
+                            {[developer.educationEntries[0].degree, developer.educationEntries[0].major].filter(Boolean).join(' in ')}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  ) : developer.education ? (
+                    <View style={styles.educationCard}>
+                      <Ionicons name="school" size={16} color="#666" />
+                      <View style={styles.educationDetails}>
+                        {developer.education.includes(',') ? (
+                          <>
+                            <Text style={styles.educationSchool}>
+                              {developer.education.split(',')[1].trim()}
+                            </Text>
+                            <Text style={styles.educationText}>
+                              {developer.education.split(',')[0].trim()}
+                            </Text>
+                          </>
+                        ) : (
+                          <Text style={styles.educationText}>{developer.education}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              )}
+
+              {/* Work Experience */}
+              {(developer.workExperiences?.length || developer.company) && (
+                <View style={styles.sectionContainer}>
+                  <Text style={styles.sectionTitle}>Experience</Text>
+                  {developer.workExperiences?.length ? (
+                    <View style={styles.workExperienceCard}>
+                      <Ionicons name="briefcase" size={16} color="#666" />
+                      <View style={styles.workExperienceDetails}>
+                        <Text style={styles.workExperienceCompany}>{developer.workExperiences[0].company}</Text>
+                        <Text style={styles.workExperienceRole}>
+                          {developer.workExperiences[0].position}
+                          {developer.workExperiences[0].startDate && (
+                            `, ${formatDateRange(developer.workExperiences[0].startDate, developer.workExperiences[0].endDate, developer.workExperiences[0].current)}`
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : developer.company ? (
+                    <View style={styles.workExperienceCard}>
+                      <Ionicons name="briefcase" size={16} color="#666" />
+                      <View style={styles.workExperienceDetails}>
+                        <Text style={styles.workExperienceCompany}>{developer.company}</Text>
+                        <Text style={styles.workExperienceRole}>
+                          {developer.position || developer.role}
+                          {developer.experience && `, ${developer.experience} year${developer.experience !== 1 ? 's' : ''}`}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              )}
+            </>
           )}
 
           {/* Tap hint */}

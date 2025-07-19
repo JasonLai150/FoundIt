@@ -7,20 +7,46 @@ export default function Index() {
   const { isAuthenticated, user, isLoading } = useAuth();
   const router = useRouter();
   const [hasNavigated, setHasNavigated] = useState(false);
+  const [authCheckTimeout, setAuthCheckTimeout] = useState<number | null>(null);
 
   useEffect(() => {
-    if (isLoading) return;
+    // Don't navigate if still loading
+    if (isLoading) {
+      return;
+    }
     
-    if (hasNavigated) return;
+    // Don't navigate if already navigated
+    if (hasNavigated) {
+      return;
+    }
     
+    // If not authenticated, go to auth
     if (!isAuthenticated) {
       router.replace('/auth');
       setHasNavigated(true);
       return;
     }
     
-    // Wait for user data to load
-    if (!user) return;
+    // Wait for user data to be fully loaded, but with a timeout
+    if (!user) {
+      // Set a timeout to prevent infinite waiting
+      if (!authCheckTimeout) {
+        const timeout = setTimeout(() => {
+          console.log('Timeout waiting for user data, redirecting to auth');
+          router.replace('/auth');
+          setHasNavigated(true);
+        }, 5000); // 5 second timeout
+        
+        setAuthCheckTimeout(timeout);
+      }
+      return;
+    }
+    
+    // Clear timeout if user data loaded
+    if (authCheckTimeout) {
+      clearTimeout(authCheckTimeout);
+      setAuthCheckTimeout(null);
+    }
     
     // Navigate based on profile completion
     if (user.profile_complete) {
@@ -30,14 +56,29 @@ export default function Index() {
     }
     
     setHasNavigated(true);
-  }, [isAuthenticated, user, isLoading, hasNavigated, router]);
+  }, [isAuthenticated, user, isLoading, hasNavigated, router, authCheckTimeout]);
 
   // Reset navigation state when user logs out
   useEffect(() => {
     if (!isAuthenticated) {
       setHasNavigated(false);
+      
+      // Clear any pending timeout
+      if (authCheckTimeout) {
+        clearTimeout(authCheckTimeout);
+        setAuthCheckTimeout(null);
+      }
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authCheckTimeout]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (authCheckTimeout) {
+        clearTimeout(authCheckTimeout);
+      }
+    };
+  }, [authCheckTimeout]);
 
   return (
     <SafeAreaView style={styles.container}>

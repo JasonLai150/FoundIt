@@ -152,7 +152,20 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
       linkedin: userData.linkedin || '',
       website: userData.website || '',
       looking: userData.goal === 'searching',
+      goal: userData.goal || 'other', // Add goal for profile card styling
       experience: calculateExperienceYears(experienceData?.work_experience || []),
+      
+      // Goal-specific fields for recruiters
+      companyName: userData.company_name,
+      companyDescription: userData.company_description,
+      desiredSkills: userData.desired_skills,
+      funding: userData.funding,
+      
+      // Goal-specific fields for investors
+      firmName: userData.firm_name,
+      firmDescription: userData.firm_description,
+      investmentAreas: userData.investment_areas,
+      investmentAmount: userData.investment_amount,
     };
 
     setCache(prev => ({
